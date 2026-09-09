@@ -13,7 +13,7 @@ come from the sibling repositories and are combined when writing the SD card.
 | Suite | `trixie` (default) or `bookworm` (LTS fallback) |
 | Architecture | `armhf` (Cortex-A9, ARMv7 + VFPv3-D16) |
 | Tool | `mmdebstrap` + `qemu-user-static` (cross-arch second stage, no KVM) |
-| Output | `rootfs.ext4` |
+| Output | `rootfs.tar.zst` (extract into a mounted ext4 partition) and `rootfs.ext4` (for `dd` / image assembly) |
 | Packages | `alsa-utils`, `mpd`, `shairport-sync`, `bluez-alsa-utils`, `libasound2-plugin-bluez`, `i2c-tools`, `openssh-server`, … |
 
 The `hooks/01-base.sh` hook runs inside the chroot and writes:
@@ -49,10 +49,19 @@ Collect the three artifact sets:
 ```
 zybo-linux    → uImage, zybo-audio.dtb
 zybo-buildroot→ boot.bin (BOOT.BIN), u-boot.img, uEnv.txt, system.bit
-zybo-debian   → rootfs.ext4
+zybo-debian   → rootfs.tar.zst (or rootfs.ext4)
 ```
 
-Then:
+**Method 1 — copy files into existing partitions (no `dd`)**
+
+```bash
+# FAT32 boot partition mounted at /mnt/boot, ext4 root partition at /mnt/root
+cp boot/*            /mnt/boot/          # BOOT.BIN, u-boot.img, uImage, dtb, uEnv.txt, system.bit
+sudo tar -xpf rootfs.tar.zst -C /mnt/root --numeric-owner
+sync && umount /mnt/boot /mnt/root
+```
+
+**Method 2 — build one image and `dd` it**
 
 ```bash
 ./scripts/make_sdcard.sh \

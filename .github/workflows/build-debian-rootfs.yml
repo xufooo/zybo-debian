@@ -58,13 +58,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             mmdebstrap qemu-user-static binfmt-support arch-test \
-            debian-archive-keyring e2fsprogs
+            debian-archive-keyring e2fsprogs fakeroot zstd
 
       - name: Check binfmt
         run: |
           ls /proc/sys/fs/binfmt_misc/ | grep -i qemu || sudo update-binfmts --enable qemu-arm
 
-      - name: Build rootfs (mmdebstrap → ext4)
+      - name: Build rootfs (mmdebstrap → tar + tar.zst)
         run: |
           PKGS="$BASE_PACKAGES"
           if [ -n "${{ github.event.inputs.extra_packages }}" ]; then
@@ -78,14 +78,26 @@ jobs:
             --aptopt='Apt::Install-Recommends "true"' \
             --include="$PKGS" \
             --hook-dir="$PWD/hooks" \
-            "$SUITE" rootfs.ext4 2>&1 | tee mmdebstrap.log
+            --format=tar \
+            "$SUITE" rootfs.tar 2>&1 | tee mmdebstrap.log
+          zstd -19 -T0 rootfs.tar -o rootfs.tar.zst
+          ls -la rootfs.tar rootfs.tar.zst
+
+      - name: Build ext4 image (optional, for dd)
+        run: |
+          mkdir -p rootfs-dir
+          fakeroot -- tar -xpf rootfs.tar -C rootfs-dir
+          SIZE_MB=$(( $(du -sm rootfs-dir | cut -f1) + 96 ))
+          fakeroot -- mke2fs -t ext4 -L rootfs -d rootfs-dir -F rootfs.ext4 "${SIZE_MB}M"
           ls -la rootfs.ext4
 
       - name: Upload rootfs artifact
         uses: actions/upload-artifact@v4
         with:
           name: debian-rootfs
-          path: rootfs.ext4
+          path: |
+            rootfs.tar.zst
+            rootfs.ext4
           if-no-files-found: error
           retention-days: 14
 
