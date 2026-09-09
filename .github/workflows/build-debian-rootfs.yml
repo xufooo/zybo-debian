@@ -1,0 +1,99 @@
+# ============================================================================
+# build-debian-rootfs.yml — ZYBO (Zynq-7000, armhf) Debian rootfs 构建
+# ============================================================================
+# 只构建用户空间（rootfs）；内核/DTB/U-Boot 复用 zybo-linux 与 zybo-buildroot 的产物。
+# 工具链：mmdebstrap + qemu-user-static（跨架构二阶段），无需 KVM。
+# 产物（artifact: debian-rootfs）：rootfs.ext4
+# 说明：
+#   - 默认 trixie（当前 stable，armhf 在初始发布架构内）；可切 bookworm（LTS）
+#   - mmdebstrap 默认不装 Recommends → 显式 --aptopt='Apt::Install-Recommends "true"'
+#   - hooks/ 内的脚本在 chroot 中执行：写 fstab/hostname/asound.conf、启用服务
+# ============================================================================
+name: Build ZYBO Debian Rootfs
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: 'Debian suite (trixie | bookworm)'
+        required: false
+        default: 'trixie'
+      extra_packages:
+        description: 'Extra packages, comma separated'
+        required: false
+        default: ''
+
+concurrency:
+  group: zybo-debian
+  cancel-in-progress: true
+
+env:
+  SUITE: ${{ github.event.inputs.suite || 'trixie' }}
+  BASE_PACKAGES: "systemd,systemd-sysv,alsa-utils,mpd,shairport-sync,bluez-alsa-utils,libasound2-plugin-bluez,i2c-tools,openssh-server,sudo,ca-certificates,locales,tzdata"
+
+jobs:
+  build:
+    name: Build Debian armhf rootfs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: false
+
+      - name: Install tools
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            mmdebstrap qemu-user-static binfmt-support arch-test \
+            debian-archive-keyring e2fsprogs
+
+      - name: Check binfmt
+        run: |
+          ls /proc/sys/fs/binfmt_misc/ | grep -i qemu || sudo update-binfmts --enable qemu-arm
+
+      - name: Build rootfs (mmdebstrap → ext4)
+        run: |
+          PKGS="$BASE_PACKAGES"
+          if [ -n "${{ github.event.inputs.extra_packages }}" ]; then
+            PKGS="$PKGS,${{ github.event.inputs.extra_packages }}"
+          fi
+          echo "suite=$SUITE"
+          echo "packages=$PKGS"
+          sudo mmdebstrap \
+            --architectures=armhf \
+            --variant=minbase \
+            --aptopt='Apt::Install-Recommends "true"' \
+            --include="$PKGS" \
+            --hook-dir="$PWD/hooks" \
+            "$SUITE" rootfs.ext4 2>&1 | tee mmdebstrap.log
+          ls -la rootfs.ext4
+
+      - name: Upload rootfs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-rootfs
+          path: rootfs.ext4
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-build-log
+          path: mmdebstrap.log
+          if-no-files-found: ignore
+          retention-days: 7

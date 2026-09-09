@@ -1,0 +1,4 @@
+rootfs.ext4
+rootfs.tar
+sdcard.img
+mmdebstrap.log
