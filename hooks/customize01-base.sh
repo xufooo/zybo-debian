@@ -45,9 +45,11 @@ EOF
 echo 'root:zybo' | chpasswd
 
 # ── 启用服务（串口 getty 由 systemd-getty-generator 依 console= 自动生成）──
-systemctl enable ssh 2>/dev/null || true
-systemctl enable mpd 2>/dev/null || true
-systemctl enable shairport-sync 2>/dev/null || true
+# chroot 里 systemctl enable 可能不生效，直接用符号链接，结果可验证
+mkdir -p /etc/systemd/system/multi-user.target.wants
+ln -sf /usr/lib/systemd/system/ssh.service            /etc/systemd/system/multi-user.target.wants/ssh.service
+ln -sf /usr/lib/systemd/system/shairport-sync.service /etc/systemd/system/multi-user.target.wants/shairport-sync.service
+ln -sf /usr/lib/systemd/system/mpd.socket             /etc/systemd/system/multi-user.target.wants/mpd.socket
 systemctl set-default multi-user.target 2>/dev/null || true
 
 echo "[hook] base configuration done"

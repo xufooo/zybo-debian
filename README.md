@@ -16,13 +16,16 @@ come from the sibling repositories and are combined when writing the SD card.
 | Output | `rootfs.tar.zst` (extract into a mounted ext4 partition) and `rootfs.ext4` (for `dd` / image assembly) |
 | Packages | `alsa-utils`, `mpd`, `shairport-sync`, `bluez-alsa-utils`, `libasound2-plugin-bluez`, `i2c-tools`, `openssh-server`, … |
 
-The `hooks/01-base.sh` hook runs inside the chroot and writes:
+The `hooks/customize01-base.sh` hook runs inside the chroot and writes:
 
 - `/etc/fstab` — root on `/dev/mmcblk0p2` (must match the U-Boot `root=`)
 - `/etc/hostname`, `/etc/hosts`
 - `/etc/asound.conf` — default PCM resampled to 48 kHz (`plug`), matching a
   fixed 12.288 MHz MCLK
-- enables `ssh`, `mpd`, `shairport-sync`
+- enables `ssh`, `shairport-sync` and `mpd.socket`
+
+Hook scripts in `hooks/` must be executable and named with one of the
+mmdebstrap stage prefixes (`setup`, `extract`, `essential`, `customize`).
 
 Serial console login needs no extra configuration: systemd's getty generator
 instantiates `serial-getty@ttyPS0` from the kernel `console=ttyPS0,115200`.
@@ -37,7 +40,7 @@ takes optional inputs for the suite and extra packages. Artifact: `debian-rootfs
 ```
 zybo-debian/
 ├── .github/workflows/build-debian-rootfs.yml
-├── hooks/01-base.sh            # chroot hook: fstab, hostname, asound.conf, services
+├── hooks/customize01-base.sh   # chroot hook: fstab, hostname, asound.conf, services
 ├── scripts/make_sdcard.sh      # assemble a flashable sdcard.img
 └── README.md
 ```
