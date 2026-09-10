@@ -86,10 +86,37 @@ jobs:
       - name: Build ext4 image (optional, for dd)
         run: |
           mkdir -p rootfs-dir
-          fakeroot -- tar -xpf rootfs.tar -C rootfs-dir
-          SIZE_MB=$(( $(du -sm rootfs-dir | cut -f1) + 96 ))
-          fakeroot -- mke2fs -t ext4 -L rootfs -d rootfs-dir -F rootfs.ext4 "${SIZE_MB}M"
+          # ⚠️ 解包与 mke2fs 必须在**同一个 fakeroot 会话**里：
+          # tar 的 chown 在 fakeroot 下只是"虚拟记录"，会话一结束就没了；分开写
+          # （fakeroot tar ... 然后 fakeroot mke2fs ...）会让 mke2fs 看到真实的
+          # 磁盘属主，结果 ext4 里所有非 root 属主全丢 —— 实测 /var/lib/mpd 变成
+          # root:root（mpd 用户写不了 tag_cache，MPD 起不来）、/etc/shadow 的
+          # shadow 组变 0。tar 本身是对的（102/29），坏的只有 ext4 这一步。
+          fakeroot -- sh -c '
+            set -e
+            tar -xpf rootfs.tar -C rootfs-dir
+            SIZE_MB=$(( $(du -sm rootfs-dir | cut -f1) + 96 ))
+            mke2fs -t ext4 -L rootfs -d rootfs-dir -F rootfs.ext4 "${SIZE_MB}M"
+          '
           ls -la rootfs.ext4
+
+      - name: Verify ownership survived into the ext4 image
+        run: |
+          # 抽查几个非 root 属主：若这里报错，说明上面的 fakeroot 会话又被拆开了
+          check() { # check <path> <regex>
+            if debugfs -R "stat $1" rootfs.ext4 2>/dev/null | grep -qE "$2"; then
+              echo "  OK   $1  ($2)"
+            else
+              debugfs -R "stat $1" rootfs.ext4 2>/dev/null | grep -E 'User:|Group:|Mode:'
+              echo "::error::$1 的属主/权限没进 ext4（期望 $2）"
+              exit 1
+            fi
+          }
+          check /var/lib/mpd        'User: *102'
+          check /var/lib/mpd/music  'User: *102'
+          check /etc/shadow         'Group: *42'
+          check /usr/bin/sudo       'Mode: *04755'
+          echo "ext4 属主/权限保留正常"
 
       - name: Upload rootfs artifact
         uses: actions/upload-artifact@v4
