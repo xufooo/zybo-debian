@@ -19,6 +19,16 @@ come from the sibling repositories and are combined when writing the SD card.
 The `hooks/customize01-base.sh` hook runs on the **host** (mmdebstrap passes the
 chroot directory as `$1`), and writes:
 
+- `/etc/systemd/network/10-eth0.link` + `20-wired.network` — Debian enables
+  systemd's predictable interface names, and the Zynq GEM is a platform device
+  with no PCI slot, so udev derives `end0` (`en` + `d`evicetree). A `.link` file
+  renames it back to **`eth0`** (rootfs-level, so `net.ifnames` bootargs stay
+  shared with the Buildroot image).
+- timezone `Asia/Shanghai`, `LANG=C.UTF-8`, `/etc/motd` banner
+- `/var/lib/alsa/asound.state` — captured on the board with
+  `amixer -c 0 sset Master 88% && alsactl store`. Without it `alsa-restore` has
+  nothing to apply and the codec stays at the driver default (Master 95%, which
+  is painfully loud). Card id in the file is `ZyboSoundCard`, matching the board.
 - `/etc/fstab` — root on `/dev/mmcblk0p2` (must match the U-Boot `root=`)
 - `/etc/hostname`, `/etc/hosts` (`zybo-audio`)
 - `/etc/systemd/network/20-wired.network` — DHCP on the on-board GEM0 (`eth0`),
@@ -54,7 +64,8 @@ takes optional inputs for the suite and extra packages. Artifact: `debian-rootfs
 ```
 zybo-debian/
 ├── .github/workflows/build-debian-rootfs.yml
-├── hooks/customize01-base.sh   # chroot hook: fstab, hostname, asound.conf, services
+├── files/asound.state          # 板上抓取的 ALSA 开机默认值（音量）
+├── hooks/customize01-base.sh   # host-side hook: fstab/网络/时区/asound.conf/mpd/服务
 ├── scripts/make_sdcard.sh      # assemble a flashable sdcard.img
 └── README.md
 ```

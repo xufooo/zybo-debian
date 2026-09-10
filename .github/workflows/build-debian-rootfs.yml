@@ -8,6 +8,8 @@
 #   - 默认 trixie（当前 stable，armhf 在初始发布架构内）；可切 bookworm（LTS）
 #   - iproute2/iputils-ping：mmdebstrap minbase 连 ip/ping 都没有，上板没法查网络
 #   - sox：板端生成测试音频（不用从主机推文件）
+#   - bluez：bluez-alsa 只是 ALSA 插件，没有 bluez 守护进程蓝牙根本起不来
+#   - nano/rsync/mpg123/usbutils/python3：板端编辑/传文件/快速验声/调试/写脚本
 #   - mmdebstrap 默认不装 Recommends → 显式 --aptopt='Apt::Install-Recommends "true"'
 #   - hooks/ 内的脚本在 chroot 中执行：写 fstab/hostname/asound.conf、启用服务
 # ============================================================================
@@ -31,7 +33,7 @@ concurrency:
 
 env:
   SUITE: ${{ github.event.inputs.suite || 'trixie' }}
-  BASE_PACKAGES: "systemd,systemd-sysv,systemd-timesyncd,alsa-utils,sox,mpd,mpc,shairport-sync,avahi-daemon,bluez-alsa-utils,libasound2-plugin-bluez,i2c-tools,iproute2,iputils-ping,openssh-server,sudo,curl,ca-certificates,locales,tzdata"
+  BASE_PACKAGES: "systemd,systemd-sysv,systemd-timesyncd,alsa-utils,sox,mpd,mpc,shairport-sync,avahi-daemon,avahi-utils,bluez,bluez-alsa-utils,libasound2-plugin-bluez,i2c-tools,iproute2,iputils-ping,openssh-server,sudo,curl,ca-certificates,locales,tzdata,nano,rsync,mpg123,usbutils,python3"
 
 jobs:
   build:
@@ -74,7 +76,8 @@ jobs:
           fi
           echo "suite=$SUITE"
           echo "packages=$PKGS"
-          sudo mmdebstrap \
+          # ZYBO_FILES 让 hook 能取到仓库 files/ 里的文件（如 asound.state）
+          sudo ZYBO_FILES="$PWD/files" mmdebstrap \
             --architectures=armhf \
             --variant=minbase \
             --aptopt='Apt::Install-Recommends "true"' \
@@ -119,6 +122,21 @@ jobs:
           check /etc/shadow         'Group: *42'
           check /usr/bin/sudo       'Mode: *04755'
           echo "ext4 属主/权限保留正常"
+
+      - name: Verify defaults landed in the image
+        run: |
+          check() { # check <path> <说明>
+            if debugfs -R "stat $1" rootfs.ext4 >/dev/null 2>&1; then
+              echo "  OK   $1  ($2)"
+            else
+              echo "::error::镜像里缺 $1（$2）"
+              exit 1
+            fi
+          }
+          check /etc/systemd/network/10-eth0.link  "网卡固定为 eth0"
+          check /var/lib/alsa/asound.state         "开机音量默认值"
+          check /etc/localtime                     "时区 Asia/Shanghai"
+          check /etc/motd                          "登录横幅"
 
       - name: Upload rootfs artifact
         uses: actions/upload-artifact@v4

@@ -28,18 +28,55 @@ cat > "$TARGET/etc/hosts" <<'EOF'
 ::1         localhost ip6-localhost ip6-loopback
 EOF
 
-# ── 网络：systemd-networkd + DHCP（ZYBO 板载 GEM0 → eth0）─────────────────
-# 内核用 CONFIG_MACB=y（已在板上确认 eth0 存在）；这里把接口拉起来。
+# ── 网络：systemd-networkd + DHCP（ZYBO 板载 GEM0）────────────────────────
+# 内核用 CONFIG_MACB=y（板上已确认网卡存在）；这里把接口拉起来。
 # 注意：mmdebstrap 的最小 rootfs 默认既没有 ifupdown 配置也没有 networkd 配置，
 # 不补的话板子起来是"有网卡但没 IP"，MPD/AirPlay/SSH 全都用不了。
 install -d "$TARGET/etc/systemd/network"
+
+# 网卡名固定为 eth0。
+# Debian 默认启用 systemd 可预测命名（net.ifnames=1），而 Zynq 的 GEM 是 platform
+# 设备、没有 PCI 槽位信息，udev 会派生出 end0（en=ethernet, d=devicetree）。
+# 单网口板子上 eth0 更好用（文档/脚本/直觉一致），所以用 .link 改回来。
+# 放在 rootfs 里而不是往 bootargs 加 net.ifnames=0：这样启动参数保持与
+# Buildroot 共用、且换 bootargs 也不会把网卡名弄丢。
+cat > "$TARGET/etc/systemd/network/10-eth0.link" <<'EOF'
+[Match]
+OriginalName=en*
+Type=ether
+
+[Link]
+Name=eth0
+EOF
+
 cat > "$TARGET/etc/systemd/network/20-wired.network" <<'EOF'
 [Match]
-Name=en* eth*
+Name=eth0 en* eth*
 
 [Network]
 DHCP=yes
 IPv6AcceptRA=yes
+EOF
+
+# ── 时区（板子无 RTC，靠 NTP 对时；时区不对日志时间全是错的）──────────────
+ln -sf /usr/share/zoneinfo/Asia/Shanghai "$TARGET/etc/localtime"
+echo "Asia/Shanghai" > "$TARGET/etc/timezone"
+
+# ── 语言：用 C.UTF-8（不需要 locale-gen，避免额外生成步骤）────────────────
+echo 'LANG=C.UTF-8' > "$TARGET/etc/locale.conf"
+
+# ── 登录横幅（与 Buildroot 版一致的观感）──────────────────────────────────
+cat > "$TARGET/etc/issue" <<'EOF'
+ZYBO Audio DSP (Debian armhf) \n \l
+EOF
+cat > "$TARGET/etc/motd" <<'EOF'
+ ZYBO Rev B 音频播放器 — Debian armhf
+
+  声卡   aplay -l            → card 0: ZyboSoundCard（48k / S32_LE）
+  音量   alsamixer -c 0      开机默认由 /var/lib/alsa/asound.state 恢复
+  播放   mpc add/play/status （曲库 /var/lib/mpd/music）
+  推送   shairport-sync 已在跑，手机 AirPlay 里选 zybo-audio
+  排查   journalctl -u mpd -f
 EOF
 
 # DNS：不引入 systemd-resolved，直接给静态 resolv.conf（够用且最少变量）
@@ -66,6 +103,18 @@ ctl.!default {
     card 0
 }
 EOF
+
+# ── 开机音量：装一份 asound.state ─────────────────────────────────────────
+# 没有这个文件时 alsa-restore 无事可做，codec 就停在驱动默认（Master 95%，
+# 实测"耳朵要聋"）。这份文件是在板子上 `amixer sset Master 88% && alsactl store`
+# 抓回来的（card id = ZyboSoundCard，与板上 /sys/class/sound/card0/id 一致）。
+# 由 CI 通过环境变量 ZYBO_FILES 指向仓库 files/ 目录传入。
+if [ -n "${ZYBO_FILES:-}" ] && [ -f "$ZYBO_FILES/asound.state" ]; then
+    install -D -m 644 "$ZYBO_FILES/asound.state" "$TARGET/var/lib/alsa/asound.state"
+    echo "[hook] installed asound.state (initial Master volume)"
+else
+    echo "[hook] WARN: ZYBO_FILES/asound.state 未提供，开机音量将用驱动默认值"
+fi
 
 # ── root 密码（开发用；首次登录后请修改）─────────────────────────────────
 chroot "$TARGET" chpasswd <<'EOF'
@@ -110,6 +159,7 @@ for u in ssh.service \
          systemd-timesyncd.service \
          avahi-daemon.service \
          shairport-sync.service \
+         bluetooth.service \
          mpd.socket; do
     if [ -e "$TARGET/usr/lib/systemd/system/$u" ]; then
         ln -sf "/usr/lib/systemd/system/$u" "$WANT/$u"
