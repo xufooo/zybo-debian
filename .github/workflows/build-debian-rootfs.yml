@@ -10,6 +10,9 @@
 #   - sox：板端生成测试音频（不用从主机推文件）
 #   - bluez：bluez-alsa 只是 ALSA 插件，没有 bluez 守护进程蓝牙根本起不来
 #   - nano/rsync/mpg123/usbutils/python3：板端编辑/传文件/快速验声/调试/写脚本
+#   - USB WiFi：wpasupplicant/iw/rfkill/wireless-regdb + 常见固件
+#     （firmware-realtek/mediatek/atheros/misc-nonfree）。内核侧驱动见 zybo-linux
+#     的 config.fragment（rtl8xxxu / rtw88 USB / mt7601u / mt76 / rt2800usb / ath9k_htc）。
 #   - mmdebstrap 默认不装 Recommends → 显式 --aptopt='Apt::Install-Recommends "true"'
 #   - hooks/ 内的脚本在 chroot 中执行：写 fstab/hostname/asound.conf、启用服务
 # ============================================================================
@@ -33,7 +36,7 @@ concurrency:
 
 env:
   SUITE: ${{ github.event.inputs.suite || 'trixie' }}
-  BASE_PACKAGES: "systemd,systemd-sysv,systemd-timesyncd,alsa-utils,sox,mpd,mpc,shairport-sync,avahi-daemon,avahi-utils,bluez,bluez-alsa-utils,libasound2-plugin-bluez,i2c-tools,iproute2,iputils-ping,openssh-server,sudo,curl,ca-certificates,locales,tzdata,nano,rsync,mpg123,usbutils,python3"
+  BASE_PACKAGES: "systemd,systemd-sysv,systemd-timesyncd,alsa-utils,sox,mpd,mpc,shairport-sync,avahi-daemon,avahi-utils,bluez,bluez-alsa-utils,libasound2-plugin-bluez,i2c-tools,iproute2,iputils-ping,openssh-server,sudo,curl,ca-certificates,locales,tzdata,nano,rsync,mpg123,usbutils,python3,wpasupplicant,iw,rfkill,wireless-regdb,firmware-realtek,firmware-mediatek,firmware-atheros,firmware-misc-nonfree"
 
 jobs:
   build:

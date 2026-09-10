@@ -62,6 +62,16 @@ DHCP=yes
 IPv6AcceptRA=yes
 EOF
 
+# 无线网卡：wlan* DHCP（关联由 wpa_supplicant 负责，见 README 的说明）
+cat > "$TARGET/etc/systemd/network/30-wireless.network" <<'EOF'
+[Match]
+Name=wl*
+
+[Network]
+DHCP=yes
+IPv6AcceptRA=yes
+EOF
+
 # ── 时区（板子无 RTC，靠 NTP 对时；时区不对日志时间全是错的）──────────────
 ln -sf /usr/share/zoneinfo/Asia/Shanghai "$TARGET/etc/localtime"
 echo "Asia/Shanghai" > "$TARGET/etc/timezone"
