@@ -29,13 +29,14 @@ cat > "$TARGET/etc/hosts" <<'EOF'
 EOF
 
 # ── ALSA 默认设备：软件重采样到 48kHz（MCLK 固定 12.288MHz）────────────────
+# 格式必须 S32_LE：axi-i2s 在 DMA 模式下只暴露 S32_LE（上板验证）
 cat > "$TARGET/etc/asound.conf" <<'EOF'
 pcm.!default {
     type plug
     slave {
         pcm "hw:0,0"
         rate 48000
-        format S24_LE
+        format S32_LE
         channels 2
     }
 }
