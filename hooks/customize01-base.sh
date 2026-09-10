@@ -18,8 +18,6 @@ proc             /proc          proc       defaults              0      0
 sysfs            /sys           sysfs      defaults              0      0
 devtmpfs         /dev           devtmpfs   mode=0755,nosuid      0      0
 tmpfs            /tmp           tmpfs      defaults,nosuid,nodev 0      0
-# 若在卡尾另建音乐分区（mkfs.ext4 -L music），取消下一行注释：
-#LABEL=music     /var/lib/mpd/music  ext4  defaults,noatime     0      2
 EOF
 
 # ── 主机名 ────────────────────────────────────────────────────────────────
