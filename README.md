@@ -90,7 +90,14 @@ sync && umount /mnt/boot /mnt/root
     --rootfs ./rootfs.ext4 \
     --out sdcard.img
 sudo dd if=sdcard.img of=/dev/sdX bs=4M status=progress conv=fsync
+
+# The image is sized to its contents (~1 GB) so it stays easy to move around.
+# After flashing, grow the root partition to the real card size:
+sudo ./scripts/grow_sdcard.sh /dev/sdX          # resizepart + e2fsck + resize2fs
 ```
+
+The layout is deliberately just two partitions — `BOOT` (FAT32) and `/` (ext4).
+Music lives on the root filesystem (`/var/lib/mpd/music`).
 
 Boot parameters used by `uEnv.txt`:
 
