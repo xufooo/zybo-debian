@@ -29,7 +29,7 @@ concurrency:
 
 env:
   SUITE: ${{ github.event.inputs.suite || 'trixie' }}
-  BASE_PACKAGES: "systemd,systemd-sysv,alsa-utils,mpd,shairport-sync,bluez-alsa-utils,libasound2-plugin-bluez,i2c-tools,openssh-server,sudo,ca-certificates,locales,tzdata"
+  BASE_PACKAGES: "systemd,systemd-sysv,systemd-timesyncd,alsa-utils,mpd,mpc,shairport-sync,avahi-daemon,bluez-alsa-utils,libasound2-plugin-bluez,i2c-tools,openssh-server,sudo,curl,ca-certificates,locales,tzdata"
 
 jobs:
   build:
