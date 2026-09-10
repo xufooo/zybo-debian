@@ -80,7 +80,11 @@ jobs:
           echo "suite=$SUITE"
           echo "packages=$PKGS"
           # ZYBO_FILES 让 hook 能取到仓库 files/ 里的文件（如 asound.state）
+          # ⚠️ 必须显式带上 non-free-firmware：firmware-realtek/mediatek/atheros/
+          #    misc-nonfree 都在该组件里；只给 main 的话 mmdebstrap 直接找不到包
+          #    （实测踩过：构建 5 分钟就失败）。
           sudo ZYBO_FILES="$PWD/files" mmdebstrap \
+            --components=main,contrib,non-free,non-free-firmware \
             --architectures=armhf \
             --variant=minbase \
             --aptopt='Apt::Install-Recommends "true"' \
