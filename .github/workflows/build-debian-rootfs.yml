@@ -6,6 +6,8 @@
 # 产物（artifact: debian-rootfs）：rootfs.ext4
 # 说明：
 #   - 默认 trixie（当前 stable，armhf 在初始发布架构内）；可切 bookworm（LTS）
+#   - iproute2/iputils-ping：mmdebstrap minbase 连 ip/ping 都没有，上板没法查网络
+#   - sox：板端生成测试音频（不用从主机推文件）
 #   - mmdebstrap 默认不装 Recommends → 显式 --aptopt='Apt::Install-Recommends "true"'
 #   - hooks/ 内的脚本在 chroot 中执行：写 fstab/hostname/asound.conf、启用服务
 # ============================================================================
@@ -29,7 +31,7 @@ concurrency:
 
 env:
   SUITE: ${{ github.event.inputs.suite || 'trixie' }}
-  BASE_PACKAGES: "systemd,systemd-sysv,systemd-timesyncd,alsa-utils,mpd,mpc,shairport-sync,avahi-daemon,bluez-alsa-utils,libasound2-plugin-bluez,i2c-tools,openssh-server,sudo,curl,ca-certificates,locales,tzdata"
+  BASE_PACKAGES: "systemd,systemd-sysv,systemd-timesyncd,alsa-utils,sox,mpd,mpc,shairport-sync,avahi-daemon,bluez-alsa-utils,libasound2-plugin-bluez,i2c-tools,iproute2,iputils-ping,openssh-server,sudo,curl,ca-certificates,locales,tzdata"
 
 jobs:
   build:

@@ -14,7 +14,7 @@ come from the sibling repositories and are combined when writing the SD card.
 | Architecture | `armhf` (Cortex-A9, ARMv7 + VFPv3-D16) |
 | Tool | `mmdebstrap` + `qemu-user-static` (cross-arch second stage, no KVM) |
 | Output | `rootfs.tar.zst` (extract into a mounted ext4 partition) and `rootfs.ext4` (for `dd` / image assembly) |
-| Packages | `alsa-utils`, `mpd`, `mpc`, `shairport-sync`, `avahi-daemon`, `bluez-alsa-utils`, `libasound2-plugin-bluez`, `systemd-timesyncd`, `i2c-tools`, `openssh-server`, `curl`, … |
+| Packages | `alsa-utils`, `sox`, `mpd`, `mpc`, `shairport-sync`, `avahi-daemon`, `bluez-alsa-utils`, `libasound2-plugin-bluez`, `systemd-timesyncd`, `i2c-tools`, `iproute2`, `iputils-ping`, `openssh-server`, `curl`, … |
 
 The `hooks/customize01-base.sh` hook runs on the **host** (mmdebstrap passes the
 chroot directory as `$1`), and writes:
