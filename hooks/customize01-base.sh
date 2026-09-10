@@ -69,6 +69,17 @@ echo "Asia/Shanghai" > "$TARGET/etc/timezone"
 # ── 语言：用 C.UTF-8（不需要 locale-gen，避免额外生成步骤）────────────────
 echo 'LANG=C.UTF-8' > "$TARGET/etc/locale.conf"
 
+# ── journald 容量上限 ─────────────────────────────────────────────────────
+# 默认 SystemMaxUse = 文件系统的 10%，而我们的 / 是 14.5G → 允许写到 1.5G，
+# 对 SD 卡既费空间又费寿命。盘上实测日志本身只有十几 MB，128M 足够回溯。
+install -d "$TARGET/etc/systemd/journald.conf.d"
+cat > "$TARGET/etc/systemd/journald.conf.d/10-zybo.conf" <<'EOF'
+[Journal]
+Storage=persistent
+SystemMaxUse=128M
+RuntimeMaxUse=32M
+EOF
+
 # ── 登录横幅（与 Buildroot 版一致的观感）──────────────────────────────────
 cat > "$TARGET/etc/issue" <<'EOF'
 ZYBO Audio DSP (Debian armhf) \n \l
