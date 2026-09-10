@@ -40,9 +40,13 @@ install -d "$TARGET/etc/systemd/network"
 # 单网口板子上 eth0 更好用（文档/脚本/直觉一致），所以用 .link 改回来。
 # 放在 rootfs 里而不是往 bootargs 加 net.ifnames=0：这样启动参数保持与
 # Buildroot 共用、且换 bootargs 也不会把网卡名弄丢。
+# ⚠️ 匹配条件只写 Type=ether：**不要写 OriginalName=en***！
+#    .link 的 [Match] 匹配的是**内核原始名**，而 Zynq 上网卡的内核名就是 eth0
+#    （"eth0" 第二个字母是 t，glob `en*` 根本不匹配 —— 实测踩过：
+#    文件在、格式对，网卡名依旧 end0，只在改名后才叫 en… 已经是 udev 的产物了）。
+#    本板单网口，用 Type=ether 即可；若将来插 USB 网卡需再加 MAC/Path 过滤。
 cat > "$TARGET/etc/systemd/network/10-eth0.link" <<'EOF'
 [Match]
-OriginalName=en*
 Type=ether
 
 [Link]
