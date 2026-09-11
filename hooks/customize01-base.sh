@@ -62,7 +62,7 @@ DHCP=yes
 IPv6AcceptRA=yes
 EOF
 
-# 无线网卡：wlan* DHCP（关联由 wpa_supplicant 负责，见 README 的说明）
+# 无线网卡：wl* DHCP（关联由 wpa_supplicant 负责，见下面与 README）
 cat > "$TARGET/etc/systemd/network/30-wireless.network" <<'EOF'
 [Match]
 Name=wl*
@@ -70,6 +70,47 @@ Name=wl*
 [Network]
 DHCP=yes
 IPv6AcceptRA=yes
+EOF
+
+# ── 无线：让"**任意** USB WiFi dongle"插上就能用（不写死接口名）────────────
+# 动机：内核侧已经带了 rtl8xxxu / rtw88(USB) / mt7601u / mt76 / rt2800usb / ath9k_htc，
+# 固件也装了；但 systemd 会按 MAC 把接口命名成 wlx<mac>（每块 dongle 都不一样），
+# 如果再按接口名去配 wpa_supplicant，就等于"只支持你手上那一块"。
+#
+# 做法（三件套）：
+#   1. 通用配置文件 /etc/wpa_supplicant/wpa_supplicant.conf（镜像里只放**占位**，
+#      出厂不带任何凭据；用户自己填 SSID/PSK，见 README）
+#   2. 模板 drop-in：让 wpa_supplicant@<iface> 读**通用**配置，而不是
+#      Debian 默认的 wpa_supplicant-<iface>.conf（那个和接口名绑死）
+#   3. udev 规则：任何 wl* 网卡 add/move 事件都自动起 wpa_supplicant@%k
+#      （move 必须写：wlan0 → wlx<mac> 的改名是一次 move 事件，只写 add 的话
+#        第一次起的实例会绑在已经不存在的接口上然后退出）
+install -d "$TARGET/etc/wpa_supplicant"
+cat > "$TARGET/etc/wpa_supplicant/wpa_supplicant.conf" <<'EOF'
+# 通用 WiFi 配置：所有 wl* 接口共用（由 udev 自动起 wpa_supplicant@<iface>）。
+# 填自己的网络（执行完会自动追加 network={...}）：
+#     wpa_passphrase "你的SSID" "你的密码" >> /etc/wpa_supplicant/wpa_supplicant.conf
+#     systemctl restart 'wpa_supplicant@*'
+# 也可以直接编辑本文件。注意权限保持 600（里面有明文 PSK）。
+ctrl_interface=DIR=/run/wpa_supplicant GROUP=netdev
+update_config=1
+country=CN
+EOF
+chmod 600 "$TARGET/etc/wpa_supplicant/wpa_supplicant.conf"
+
+install -d "$TARGET/etc/systemd/system/wpa_supplicant@.service.d"
+cat > "$TARGET/etc/systemd/system/wpa_supplicant@.service.d/10-generic-conf.conf" <<'EOF'
+[Service]
+ExecStart=
+ExecStart=/sbin/wpa_supplicant -c/etc/wpa_supplicant/wpa_supplicant.conf -i%I
+EOF
+
+cat > "$TARGET/etc/udev/rules.d/70-wifi-autoconf.rules" <<'EOF'
+# 任意 USB WiFi 网卡（接口名 wl*）自动起 wpa_supplicant 实例。
+# 不按接口名写死的理由见 zybo-debian 的 hooks/customize01-base.sh。
+SUBSYSTEM=="net", ACTION=="add",  KERNEL=="wl*", TAG+="systemd", ENV{SYSTEMD_WANTS}+="wpa_supplicant@%k.service"
+# 改名（wlan0 → wlx<mac>）是 move 事件，必须同样处理。
+SUBSYSTEM=="net", ACTION=="move", KERNEL=="wl*", TAG+="systemd", ENV{SYSTEMD_WANTS}+="wpa_supplicant@%k.service"
 EOF
 
 # ── 时区（板子无 RTC，靠 NTP 对时；时区不对日志时间全是错的）──────────────

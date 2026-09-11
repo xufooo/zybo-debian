@@ -6,6 +6,34 @@ Builds a Debian armhf root filesystem on GitHub Actions with `mmdebstrap`.
 The kernel, device tree, U-Boot and PL bitstream are **not** built here — they
 come from the sibling repositories and are combined when writing the SD card.
 
+## USB WiFi（任意 dongle，插上即用）
+
+镜像里带 `wpasupplicant / iw / rfkill / wireless-regdb` 与常见固件
+（`firmware-realtek / mediatek / atheros / misc-nonfree`），内核侧驱动见
+`zybo-linux/kernel/config.fragment`（`rtl8xxxu`、`rtw88` USB、`mt7601u`、`mt76`、
+`rt2800usb`、`ath9k_htc`）。
+
+**接口名不写死**：systemd 会按 MAC 命名成 `wlx<mac>`，每块 dongle 都不同，所以：
+
+- `/etc/systemd/network/30-wireless.network` 匹配 `Name=wl*` → DHCP
+- `/etc/udev/rules.d/70-wifi-autoconf.rules` → 任何 `wl*` 的 add/move 事件自动起
+  `wpa_supplicant@<iface>`
+- `/etc/systemd/system/wpa_supplicant@.service.d/10-generic-conf.conf` → 让实例读
+  **通用**配置 `/etc/wpa_supplicant/wpa_supplicant.conf`（Debian 默认是按接口名找
+  `wpa_supplicant-<iface>.conf`，那等于只支持一块 dongle）
+
+出厂**不带任何 WiFi 凭据**，上板后填自己的网络即可：
+
+```bash
+wpa_passphrase "你的SSID" "你的密码" >> /etc/wpa_supplicant/wpa_supplicant.conf
+systemctl restart 'wpa_supplicant@*'
+ip -br addr show wl*        # 拿到 IP 就行
+```
+
+> 已在板上实测：把按接口名静态启用的服务 `disable` 掉、只留 udev 规则，
+> 带电重新枚举 USB 网卡后 **5 秒内**自动重新关联并拿到 IP（服务由 udev 拉起，
+> 见 `zybo-linux`/`audio_player` 的 `docs/TROUBLESHOOTING.md` §19）。
+
 ## What it builds
 
 | Item | Value |
