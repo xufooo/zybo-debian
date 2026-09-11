@@ -30,9 +30,17 @@ systemctl restart 'wpa_supplicant@*'
 ip -br addr show wl*        # 拿到 IP 就行
 ```
 
-> 已在板上实测：把按接口名静态启用的服务 `disable` 掉、只留 udev 规则，
-> 带电重新枚举 USB 网卡后 **5 秒内**自动重新关联并拿到 IP（服务由 udev 拉起，
-> 见 `zybo-linux`/`audio_player` 的 `docs/TROUBLESHOOTING.md` §19）。
+> 已在板上实测两条路径：
+> - **带电热插拔**：把按接口名静态启用的服务 `disable` 掉、只留 udev 规则，重新枚举 USB
+>   网卡后 **5 秒内**自动重新关联并拿到 IP；
+> - **冷启动换 dongle**：换上一块板子从没见过的 MT7601U（`148f:7601`）后重启，开机自动
+>   加载固件、改名 `wlx<mac>`、关联并拿到 IP；`wpa_supplicant@<iface>` 的状态是
+>   `is-enabled=disabled` 但 `is-active=active` ⇒ 确实由 udev 按需拉起。
+>
+> 固件归属（常见 dongle 全覆盖）：`firmware-realtek`（rtl8xxxu / rtw88）、
+> `firmware-mediatek`（mt7601u、mt76）、`firmware-atheros`（ath9k_htc）、
+> `firmware-misc-nonfree`（rt2800usb 等）。细节见 `audio_player` 的
+> `docs/TROUBLESHOOTING.md` §19。
 
 ## What it builds
 
