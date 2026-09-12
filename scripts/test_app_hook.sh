@@ -1,10 +1,11 @@
 #!/bin/sh
 # ============================================================================
-# test_app_hook.sh — 不跑 mmdebstrap，直接干跑 app hook 并断言装出来的树
+# test_app_hook.sh — dry-run the app hook without mmdebstrap and assert the tree
 # ============================================================================
-# customize02-app.sh 刻意不 chroot，所以可以拿临时目录当 rootfs 验证。
-# 用法：./scripts/test_app_hook.sh
-# 退出码 0 = 全部通过。
+# customize02-app.sh deliberately does not chroot, so a temporary directory can
+# be used as the rootfs for verification.
+# Usage: ./scripts/test_app_hook.sh
+# Exit code 0 = all checks passed.
 # ============================================================================
 set -eu
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -14,45 +15,45 @@ trap 'rm -rf "$T"' EXIT
 FAIL=0
 ok() { printf '  ✓ %s\n' "$1"; }
 bad() { printf '  ✗ %s\n' "$1"; FAIL=$((FAIL + 1)); }
-chk() { [ -e "$2" ] && ok "$1" || bad "$1（缺 $2）"; }
-# 软链要用 -L：目标是指向镜像内的绝对路径，宿主上 -e 会失败
-chklink() { [ -L "$2" ] && ok "$1" || bad "$1（缺软链 $2）"; }
+chk() { [ -e "$2" ] && ok "$1" || bad "$1 (missing $2)"; }
+# Use -L for symlinks: the target is an absolute path inside the image, so -e fails on the host
+chklink() { [ -L "$2" ] && ok "$1" || bad "$1 (missing symlink $2)"; }
 
-echo "== 干跑 hooks/customize02-app.sh → $T =="
+echo "== dry-run hooks/customize02-app.sh -> $T =="
 ZYBO_FILES="$REPO/files" sh "$REPO/hooks/customize02-app.sh" "$T"
 
-echo "== 断言 =="
-chk "后端二进制"            "$T/usr/local/bin/zybo-audio-web"
-chk "WebUI"                 "$T/var/www/zybo-audio/index.html"
-chk "favicon"               "$T/var/www/zybo-audio/assets/favicon.svg"
-chk "systemd 单元"          "$T/usr/lib/systemd/system/zybo-audio-web.service"
-chklink "单元已启用（软链）" "$T/etc/systemd/system/multi-user.target.wants/zybo-audio-web.service"
-chk "版本号随镜像"          "$T/usr/share/doc/zybo-audio/VERSION"
-chk "第三方许可清单"        "$T/usr/share/doc/zybo-audio/THIRD-PARTY.md"
+echo "== assertions =="
+chk "backend binary"           "$T/usr/local/bin/zybo-audio-web"
+chk "WebUI"                    "$T/var/www/zybo-audio/index.html"
+chk "favicon"                  "$T/var/www/zybo-audio/assets/favicon.svg"
+chk "systemd unit"             "$T/usr/lib/systemd/system/zybo-audio-web.service"
+chklink "unit enabled (symlink)" "$T/etc/systemd/system/multi-user.target.wants/zybo-audio-web.service"
+chk "version shipped"          "$T/usr/share/doc/zybo-audio/VERSION"
+chk "third-party license list" "$T/usr/share/doc/zybo-audio/THIRD-PARTY.md"
 
-# 二进制必须是能跑的 ARM 静态可执行（板子是 armv7）
+# The binary must be a runnable static ARM executable (the board is armv7)
 if file "$T/usr/local/bin/zybo-audio-web" 2>/dev/null | grep -q "ARM, EABI5.*statically linked"; then
-    ok "二进制是静态 ARM"
+    ok "binary is static ARM"
 else
-    bad "二进制不是静态 ARM"
+    bad "binary is not static ARM"
 fi
 
-# 单元里的 ExecStart 必须指向真实装进去的路径
+# The unit's ExecStart must point at the path that was actually installed
 EXEC="$(grep -m1 '^ExecStart=' "$T/usr/lib/systemd/system/zybo-audio-web.service" | cut -d= -f2)"
-if [ -x "$T$EXEC" ]; then ok "ExecStart 指向已安装的二进制（$EXEC）"; else bad "ExecStart $EXEC 不存在"; fi
+if [ -x "$T$EXEC" ]; then ok "ExecStart points at the installed binary ($EXEC)"; else bad "ExecStart $EXEC does not exist"; fi
 
-# 启用的软链必须指向真实单元
+# The enable symlink must point at a real unit
 LINK="$(readlink "$T/etc/systemd/system/multi-user.target.wants/zybo-audio-web.service")"
 if [ "$LINK" = "/usr/lib/systemd/system/zybo-audio-web.service" ]; then
-    ok "enable 软链目标正确"
+    ok "enable symlink target is correct"
 else
-    bad "enable 软链目标异常：$LINK"
+    bad "unexpected enable symlink target: $LINK"
 fi
 
-# 许可原文（合规要求）：至少要有 Digilent MIT 与 Go BSD-3
+# License texts (compliance requirement): Digilent MIT and Go BSD-3 at minimum
 for f in Digilent-MIT.txt Go-BSD-3-Clause.txt gorilla-websocket-BSD-3-Clause.txt; do
-    chk "许可原文 $f" "$T/usr/share/doc/zybo-audio/licenses/$f"
+    chk "license text $f" "$T/usr/share/doc/zybo-audio/licenses/$f"
 done
 
-if [ "$FAIL" -eq 0 ]; then echo "== 全部通过 =="; else echo "== $FAIL 项失败 =="; fi
+if [ "$FAIL" -eq 0 ]; then echo "== all checks passed =="; else echo "== $FAIL check(s) failed =="; fi
 exit "$FAIL"

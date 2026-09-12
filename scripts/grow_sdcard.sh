@@ -1,43 +1,46 @@
 #!/bin/bash
 # ============================================================================
-# grow_sdcard.sh — 把已烧好的 SD 卡根分区扩到整张卡
+# grow_sdcard.sh — grow the root partition of a flashed SD card to the full card
 # ============================================================================
-# 背景：sdcard.img 是按"内容 + 少量余量"做的（约 1GB），烧到 8/16/32GB 卡上
-#       后面全是空的。这里把根分区和其上的 ext4 一起撑满整张卡。
-#       （镜像本身保持小体积 = 便于传输；扩容是烧写后的一次性动作。）
-# 用法：sudo ./grow_sdcard.sh /dev/sdX [分区号，默认 2]
-# 注意：设备必须未被挂载；会自动跑 e2fsck（必要，否则 resize2fs 拒绝）
+# Background: sdcard.img is built for "content + a little slack" (about 1GB), so
+#       flashing it onto an 8/16/32GB card leaves most of the card empty. This
+#       script grows the root partition and its ext4 filesystem to fill the card.
+#       (Keeping the image small makes it easy to transfer; growing is a
+#       one-time action after flashing.)
+# Usage: sudo ./grow_sdcard.sh /dev/sdX [partition number, default 2]
+# Note: the device must not be mounted; e2fsck is run automatically (required,
+#       otherwise resize2fs refuses to run)
 # ============================================================================
 set -euo pipefail
 
-DEV="${1:?用法: $0 /dev/sdX [分区号，默认 2]}"
+DEV="${1:?usage: $0 /dev/sdX [partition number, default 2]}"
 PART="${2:-2}"
-[ -b "$DEV" ] || { echo "[ERROR] $DEV 不是块设备" >&2; exit 1; }
+[ -b "$DEV" ] || { echo "[ERROR] $DEV is not a block device" >&2; exit 1; }
 
-# mmcblk0 → /dev/mmcblk0p2；sdc → /dev/sdc2
+# mmcblk0 -> /dev/mmcblk0p2 ; sdc -> /dev/sdc2
 case "$DEV" in
     *mmcblk*|*nvme*) PARTPATH="${DEV}p${PART}" ;;
     *)               PARTPATH="${DEV}${PART}"  ;;
 esac
-[ -b "$PARTPATH" ] || { echo "[ERROR] 找不到分区 $PARTPATH" >&2; exit 1; }
+[ -b "$PARTPATH" ] || { echo "[ERROR] partition $PARTPATH not found" >&2; exit 1; }
 
 if mount | grep -q "^${DEV}"; then
-    echo "[ERROR] $DEV 还有分区挂载着，先 umount" >&2; exit 1
+    echo "[ERROR] $DEV still has mounted partitions; unmount them first" >&2; exit 1
 fi
 
-echo "[GROW] 分区表（改前）"
+echo "[GROW] partition table (before)"
 parted -s "$DEV" unit s print
 
-echo "[GROW] 扩展 ${PARTPATH} 到卡尾"
+echo "[GROW] extend ${PARTPATH} to the end of the card"
 parted -s "$DEV" resizepart "$PART" 100%
 partprobe "$DEV"; sleep 2
 
-echo "[GROW] e2fsck（resize2fs 的前置要求）"
+echo "[GROW] e2fsck (prerequisite for resize2fs)"
 e2fsck -f -y "$PARTPATH"
 
 echo "[GROW] resize2fs"
 resize2fs "$PARTPATH"
 
-echo "[GROW] 结果"
+echo "[GROW] result"
 dumpe2fs -h "$PARTPATH" 2>/dev/null | grep -E '^Block count|^Block size|^Free blocks'
 lsblk -o NAME,SIZE,FSTYPE,LABEL "$DEV"

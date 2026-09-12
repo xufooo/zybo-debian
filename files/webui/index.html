@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -47,11 +47,11 @@
   .eq-panel{background:#1a1a2e;border-radius:14px;padding:16px 12px}
   .eq-sliders{display:flex;justify-content:space-between;gap:2px;height:140px}
   .eq-col{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px}
-  /* 竖排滑杆：把横滑杆 rotate(-90deg)。外层 .track 只负责占位，
-     滑杆的**布局宽度**因此只有 28px。
-     ⚠️ 别再用 `width:120px + writing-mode:bt-lr + -webkit-appearance:slider-vertical`
-     那套老 hack：布局宽度仍是 120px，flex 列被撑到 120px，6 列共 764px，
-     手机上直接横向溢出（桌面只是"看不太出来"）。 */
+  /* Vertical sliders: rotate a horizontal slider by -90deg. The outer .track only
+     reserves space, so the slider's layout width is just 28px.
+     Do NOT reintroduce the old `width:120px + writing-mode:bt-lr +
+     -webkit-appearance:slider-vertical` hack: its layout width is still 120px, the
+     flex column stretches to 120px and 6 columns total 764px, which overflows on phones. */
   .eq-col .track{position:relative;width:28px;height:120px}
   .eq-col input[type=range]{position:absolute;top:50%;left:50%;
        width:120px;height:28px;margin:0;
@@ -106,41 +106,41 @@
   <!-- Now Playing ─────────────────────────────────────── -->
   <div class="card" id="now-playing">
     <div class="art" id="art">🎵</div>
-    <div class="title" id="np-title">未连接音源</div>
-    <div class="artist" id="np-artist">选择音源开始播放</div>
-    <div><span class="source-badge" id="source-badge">闲置</span></div>
+    <div class="title" id="np-title">No source connected</div>
+    <div class="artist" id="np-artist">Select a source to start playing</div>
+    <div><span class="source-badge" id="source-badge">Idle</span></div>
   </div>
 
   <!-- Source Selector ─────────────────────────────────── -->
   <div class="source-row" id="source-row">
-    <button class="src-btn active" data-src="idle"     id="src-idle">🛑 停止</button>
+    <button class="src-btn active" data-src="idle"     id="src-idle">🛑 Stop</button>
     <button class="src-btn"         data-src="airplay"  id="src-airplay">📱 AirPlay</button>
     <button class="src-btn"         data-src="dlna"      id="src-dlna">🏠 DLNA</button>
-    <button class="src-btn"         data-src="bluetooth" id="src-bt">🎧 蓝牙</button>
+    <button class="src-btn"         data-src="bluetooth" id="src-bt">🎧 Bluetooth</button>
   </div>
 
   <!-- EQ Panel ────────────────────────────────────────── -->
   <div class="eq-panel" id="eq-panel">
-    <div class="section-title">均衡器</div>
+    <div class="section-title">Equalizer</div>
     <div class="eq-sliders" id="eq-sliders"></div>
     <div class="presets" id="presets"></div>
     <div style="display:flex;gap:6px;justify-content:center;margin-top:4px">
-      <button class="pst-btn" id="btn-import" title="Import REW/AutoEQ/JSON config">📥 导入</button>
-      <a class="pst-btn" id="btn-export" href="/api/dsp/export?format=rew" download style="text-decoration:none">📤 导出REW</a>
+      <button class="pst-btn" id="btn-import" title="Import REW/AutoEQ/JSON config">📥 Import</button>
+      <a class="pst-btn" id="btn-export" href="/api/dsp/export?format=rew" download style="text-decoration:none">📤 Export REW</a>
       <input type="file" id="file-import" accept=".txt,.json" style="display:none">
     </div>
   </div>
 
   <!-- Limiter ─────────────────────────────────────────── -->
-  <div class="section-title">限幅器（防削顶）</div>
+  <div class="section-title">Limiter (anti-clipping)</div>
   <div class="vol-row">
-    <button class="pst-btn" id="lim-toggle">限幅 开</button>
+    <button class="pst-btn" id="lim-toggle">Limiter on</button>
     <input type="range" id="lim-thr" min="-24" max="0" value="-1" step="0.5">
     <span class="pct" id="lim-thr-val">-1.0 dBFS</span>
   </div>
 
   <!-- Volume ──────────────────────────────────────────── -->
-  <div class="section-title">主音量</div>
+  <div class="section-title">Main volume</div>
   <div class="vol-row">
     <span class="icon">🔈</span>
     <input type="range" id="vol-slider" min="0" max="100" value="80" step="1">
@@ -152,7 +152,7 @@
   <div class="status-bar" id="status-bar">
     <span>CPU <span id="sys-cpu">--</span>%</span>
     <span>RAM <span id="sys-ram">--</span>MB</span>
-    <span>运行 <span id="sys-uptime">--</span></span>
+    <span>Uptime <span id="sys-uptime">--</span></span>
   </div>
 
 </div>
@@ -164,7 +164,7 @@ let state = {
   dsp:{ enabled:true, bypass:false, preset:'flat', bands:[] },
   system:{ cpu_percent:0, mem_used_mb:0, uptime_sec:0 }
 };
-// 6 段频点：必须 ≥60Hz（Q3.15 系数在 48kHz 下的稳定下限，见 backend/dsp.go）
+// 6 bands: frequencies must be >=60Hz (stability limit of the Q3.15 coefficients at 48kHz, see backend/dsp.go)
 const BAND_FREQS = [60,150,400,1000,3000,10000];
 const freqLabels = ['60','150','400','1k','3k','10k'];
 const presetNames = ['flat','rock','jazz','classical','vocal','bass'];
@@ -200,11 +200,11 @@ function connectWS(){
 // ── Render ────────────────────────────────────────────────────────────
 function render(){
   // now-playing
-  setText('np-title', state.title || (state.playing ? '播放中...' : '未连接音源'));
+  setText('np-title', state.title || (state.playing ? 'Playing...' : 'No source connected'));
   setText('np-artist', state.artist ? state.artist+(state.album?' — '+state.album:'') :
-    (state.source==='idle'?'选择音源开始播放':state.source+' 已连接'));
-  $('source-badge').textContent = state.source==='idle' ? '闲置' :
-    state.source==='airplay' ? 'AirPlay' : state.source==='dlna' ? 'DLNA' : '蓝牙';
+    (state.source==='idle'?'Select a source to start playing':state.source+' connected'));
+  $('source-badge').textContent = state.source==='idle' ? 'Idle' :
+    state.source==='airplay' ? 'AirPlay' : state.source==='dlna' ? 'DLNA' : 'Bluetooth';
   $('source-badge').style.background = state.source==='idle'?'#25253e':'#2a2a4e';
 
   // source buttons
@@ -212,11 +212,11 @@ function render(){
     const el = $('src-'+s);
     if(!el) return;
     el.classList.toggle('active', state.source===s);
-    // 本镜像没打包的音源直接从界面隐藏（灰按钮 + tooltip 仍会让人以为“能点只是被禁用”）
+    // Sources not packaged in this image are hidden entirely (a greyed-out button with a tooltip still looks clickable)
     const avail = (s==='idle') || !state.sources || state.sources[s] !== false;
     el.disabled = !avail;
     el.style.display = avail ? '' : 'none';
-    el.title = avail ? '' : '本镜像未安装该音源';
+    el.title = avail ? '' : 'Source not installed in this image';
   });
 
   // volume
@@ -227,7 +227,7 @@ function render(){
   // EQ sliders
   renderEQ();
 
-  // 版本号（发布版自报身份，便于对着镜像核对）
+  // Version (a release reports its identity, making it easy to match against an image)
   setText('app-ver', state.version ? 'v'+state.version : '');
 
   // system
@@ -290,7 +290,7 @@ function renderEQ(){
 function buildPresets(){
   const container = $('presets');
   const labels = { flat:'Flat', rock:'Rock', jazz:'Jazz',
-                   classical:'古典', vocal:'人声', bass:'低音' };
+                   classical:'Classical', vocal:'Vocal', bass:'Bass' };
   presetNames.forEach(function(name){
     const btn = document.createElement('button');
     btn.className = 'pst-btn';
@@ -365,7 +365,7 @@ function renderLimiter(){
   const d = state.dsp || {};
   const btn = $('lim-toggle');
   if(btn){
-    btn.textContent = d.limiter ? '限幅 开' : '限幅 关';
+    btn.textContent = d.limiter ? 'Limiter on' : 'Limiter off';
     btn.classList.toggle('active', !!d.limiter);
   }
   const thr = $('lim-thr');

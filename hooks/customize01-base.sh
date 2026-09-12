@@ -2,14 +2,15 @@
 # ============================================================================
 # customize01-base.sh — mmdebstrap customize hook
 # ============================================================================
-# 重要：mmdebstrap 的 hook 在**宿主**上执行，chroot 目录通过 $1 传入。
-# 因此所有路径都必须加 "$TARGET" 前缀；需要真正进入 chroot 的命令用 chroot "$TARGET"。
+# IMPORTANT: mmdebstrap runs hooks on the HOST and passes the chroot directory
+# in $1. All paths must therefore be prefixed with "$TARGET"; use
+# chroot "$TARGET" for commands that must really run inside the chroot.
 # ============================================================================
 set -e
 
 TARGET="${1:?usage: mmdebstrap hook requires the chroot directory as \$1}"
 
-# ── /etc/fstab（必须与 U-Boot 的 root= 一致：SD 卡第二分区）────────────────
+# --- /etc/fstab (must match U-Boot's root= : the second SD card partition) ----
 mkdir -p "$TARGET/etc"
 cat > "$TARGET/etc/fstab" <<'EOF'
 # <file system>  <mount point>  <type>     <options>             <dump> <pass>
@@ -20,7 +21,7 @@ devtmpfs         /dev           devtmpfs   mode=0755,nosuid      0      0
 tmpfs            /tmp           tmpfs      defaults,nosuid,nodev 0      0
 EOF
 
-# ── 主机名 ────────────────────────────────────────────────────────────────
+# --- Hostname ---------------------------------------------------------------
 echo zybo-audio > "$TARGET/etc/hostname"
 cat > "$TARGET/etc/hosts" <<'EOF'
 127.0.0.1   localhost
@@ -28,23 +29,28 @@ cat > "$TARGET/etc/hosts" <<'EOF'
 ::1         localhost ip6-localhost ip6-loopback
 EOF
 
-# ── 网络：systemd-networkd + DHCP（ZYBO 板载 GEM0）────────────────────────
-# 内核用 CONFIG_MACB=y（板上已确认网卡存在）；这里把接口拉起来。
-# 注意：mmdebstrap 的最小 rootfs 默认既没有 ifupdown 配置也没有 networkd 配置，
-# 不补的话板子起来是"有网卡但没 IP"，MPD/AirPlay/SSH 全都用不了。
+# --- Network: systemd-networkd + DHCP (ZYBO on-board GEM0) ------------------
+# The kernel uses CONFIG_MACB=y (the NIC is confirmed present on the board);
+# this section just brings the interface up.
+# NOTE: a minimal mmdebstrap rootfs ships neither ifupdown nor networkd
+# configuration; without it the board boots with "NIC present but no IP" and
+# MPD/AirPlay/SSH are all unusable.
 install -d "$TARGET/etc/systemd/network"
 
-# 网卡名固定为 eth0。
-# Debian 默认启用 systemd 可预测命名（net.ifnames=1），而 Zynq 的 GEM 是 platform
-# 设备、没有 PCI 槽位信息，udev 会派生出 end0（en=ethernet, d=devicetree）。
-# 单网口板子上 eth0 更好用（文档/脚本/直觉一致），所以用 .link 改回来。
-# 放在 rootfs 里而不是往 bootargs 加 net.ifnames=0：这样启动参数保持与
-# Buildroot 共用、且换 bootargs 也不会把网卡名弄丢。
-# ⚠️ 匹配条件只写 Type=ether：**不要写 OriginalName=en***！
-#    .link 的 [Match] 匹配的是**内核原始名**，而 Zynq 上网卡的内核名就是 eth0
-#    （"eth0" 第二个字母是 t，glob `en*` 根本不匹配 —— 实测踩过：
-#    文件在、格式对，网卡名依旧 end0，只在改名后才叫 en… 已经是 udev 的产物了）。
-#    本板单网口，用 Type=ether 即可；若将来插 USB 网卡需再加 MAC/Path 过滤。
+# Pin the interface name to eth0.
+# Debian enables systemd predictable naming by default (net.ifnames=1), and the
+# Zynq GEM is a platform device with no PCI slot information, so udev derives
+# end0 (en=ethernet, d=devicetree). On a single-NIC board eth0 is friendlier
+# (docs, scripts and expectations all agree), so rename it back with a .link file.
+# This lives in the rootfs instead of adding net.ifnames=0 to bootargs so the
+# boot arguments stay shared with Buildroot and the name survives bootargs changes.
+# NOTE: match on Type=ether only -- do NOT write OriginalName=en* !
+#    The [Match] section of a .link file matches the KERNEL name, and on Zynq the
+#    kernel name of the NIC is already eth0 (the second letter of "eth0" is "t",
+#    so the glob `en*` does not match at all: the file can be present and correct
+#    and the interface still ends up named end0).
+#    This board has a single NIC, so Type=ether is enough; add MAC/Path filters if
+#    a USB NIC is ever used.
 cat > "$TARGET/etc/systemd/network/10-eth0.link" <<'EOF'
 [Match]
 Type=ether
@@ -62,7 +68,7 @@ DHCP=yes
 IPv6AcceptRA=yes
 EOF
 
-# 无线网卡：wl* DHCP（关联由 wpa_supplicant 负责，见下面与 README）
+# Wireless NIC: DHCP on wl* (association is handled by wpa_supplicant, see below and the README)
 cat > "$TARGET/etc/systemd/network/30-wireless.network" <<'EOF'
 [Match]
 Name=wl*
@@ -72,26 +78,31 @@ DHCP=yes
 IPv6AcceptRA=yes
 EOF
 
-# ── 无线：让"**任意** USB WiFi dongle"插上就能用（不写死接口名）────────────
-# 动机：内核侧已经带了 rtl8xxxu / rtw88(USB) / mt7601u / mt76 / rt2800usb / ath9k_htc，
-# 固件也装了；但 systemd 会按 MAC 把接口命名成 wlx<mac>（每块 dongle 都不一样），
-# 如果再按接口名去配 wpa_supplicant，就等于"只支持你手上那一块"。
+# --- WiFi: make ANY USB WiFi dongle work out of the box (no hardcoded interface name) ---
+# Rationale: the kernel already carries rtl8xxxu / rtw88(USB) / mt7601u / mt76 /
+# rt2800usb / ath9k_htc and the firmware is installed; but systemd names the
+# interface wlx<mac> per MAC address (different for every dongle), so configuring
+# wpa_supplicant by interface name would support only one specific dongle.
 #
-# 做法（三件套）：
-#   1. 通用配置文件 /etc/wpa_supplicant/wpa_supplicant.conf（镜像里只放**占位**，
-#      出厂不带任何凭据；用户自己填 SSID/PSK，见 README）
-#   2. 模板 drop-in：让 wpa_supplicant@<iface> 读**通用**配置，而不是
-#      Debian 默认的 wpa_supplicant-<iface>.conf（那个和接口名绑死）
-#   3. udev 规则：任何 wl* 网卡 add/move 事件都自动起 wpa_supplicant@%k
-#      （move 必须写：wlan0 → wlx<mac> 的改名是一次 move 事件，只写 add 的话
-#        第一次起的实例会绑在已经不存在的接口上然后退出）
+# Approach (three parts):
+#   1. A shared config file /etc/wpa_supplicant/wpa_supplicant.conf (the image
+#      ships only a placeholder with no credentials; the user fills in SSID/PSK,
+#      see the README)
+#   2. A template drop-in so wpa_supplicant@<iface> reads the shared config
+#      instead of Debian's default wpa_supplicant-<iface>.conf, which is tied to
+#      the interface name
+#   3. A udev rule that starts wpa_supplicant@%k for every wl* add/move event
+#      (move must be included: the wlan0 -> wlx<mac> rename is a move event, and
+#       with add only, the first instance would bind to an interface that no
+#       longer exists and then exit)
 install -d "$TARGET/etc/wpa_supplicant"
 cat > "$TARGET/etc/wpa_supplicant/wpa_supplicant.conf" <<'EOF'
-# 通用 WiFi 配置：所有 wl* 接口共用（由 udev 自动起 wpa_supplicant@<iface>）。
-# 填自己的网络（执行完会自动追加 network={...}）：
-#     wpa_passphrase "你的SSID" "你的密码" >> /etc/wpa_supplicant/wpa_supplicant.conf
+# Shared WiFi configuration: used by every wl* interface (udev starts
+# wpa_supplicant@<iface> automatically).
+# Add your own network (this appends a network={...} block):
+#     wpa_passphrase "YOUR_SSID" "YOUR_PASSWORD" >> /etc/wpa_supplicant/wpa_supplicant.conf
 #     systemctl restart 'wpa_supplicant@*'
-# 也可以直接编辑本文件。注意权限保持 600（里面有明文 PSK）。
+# You can also edit this file directly. Keep permissions at 600 (it holds a plaintext PSK).
 ctrl_interface=DIR=/run/wpa_supplicant GROUP=netdev
 update_config=1
 country=CN
@@ -106,23 +117,24 @@ ExecStart=/sbin/wpa_supplicant -c/etc/wpa_supplicant/wpa_supplicant.conf -i%I
 EOF
 
 cat > "$TARGET/etc/udev/rules.d/70-wifi-autoconf.rules" <<'EOF'
-# 任意 USB WiFi 网卡（接口名 wl*）自动起 wpa_supplicant 实例。
-# 不按接口名写死的理由见 zybo-debian 的 hooks/customize01-base.sh。
+# Start a wpa_supplicant instance automatically for any USB WiFi NIC (interface wl*).
+# See hooks/customize01-base.sh in zybo-debian for why the interface name is not hardcoded.
 SUBSYSTEM=="net", ACTION=="add",  KERNEL=="wl*", TAG+="systemd", ENV{SYSTEMD_WANTS}+="wpa_supplicant@%k.service"
-# 改名（wlan0 → wlx<mac>）是 move 事件，必须同样处理。
+# The rename (wlan0 -> wlx<mac>) is a move event and must be handled as well.
 SUBSYSTEM=="net", ACTION=="move", KERNEL=="wl*", TAG+="systemd", ENV{SYSTEMD_WANTS}+="wpa_supplicant@%k.service"
 EOF
 
-# ── 时区（板子无 RTC，靠 NTP 对时；时区不对日志时间全是错的）──────────────
+# --- Time zone (the board has no RTC and relies on NTP; a wrong zone makes every log timestamp wrong) ---
 ln -sf /usr/share/zoneinfo/Asia/Shanghai "$TARGET/etc/localtime"
 echo "Asia/Shanghai" > "$TARGET/etc/timezone"
 
-# ── 语言：用 C.UTF-8（不需要 locale-gen，避免额外生成步骤）────────────────
+# --- Locale: C.UTF-8 (no locale-gen needed, avoiding an extra build step) ---
 echo 'LANG=C.UTF-8' > "$TARGET/etc/locale.conf"
 
-# ── journald 容量上限 ─────────────────────────────────────────────────────
-# 默认 SystemMaxUse = 文件系统的 10%，而我们的 / 是 14.5G → 允许写到 1.5G，
-# 对 SD 卡既费空间又费寿命。盘上实测日志本身只有十几 MB，128M 足够回溯。
+# --- journald size cap ------------------------------------------------------
+# The default SystemMaxUse is 10% of the filesystem, and our / is 14.5G, which
+# would allow 1.5G -- wasteful in both space and SD card lifetime. The journal is
+# only a few tens of MB in practice, so 128M is plenty to look back through.
 install -d "$TARGET/etc/systemd/journald.conf.d"
 cat > "$TARGET/etc/systemd/journald.conf.d/10-zybo.conf" <<'EOF'
 [Journal]
@@ -131,28 +143,28 @@ SystemMaxUse=128M
 RuntimeMaxUse=32M
 EOF
 
-# ── 登录横幅（与 Buildroot 版一致的观感）──────────────────────────────────
+# --- Login banner (same look as the Buildroot image) ------------------------
 cat > "$TARGET/etc/issue" <<'EOF'
 ZYBO Audio DSP (Debian armhf) \n \l
 EOF
 cat > "$TARGET/etc/motd" <<'EOF'
- ZYBO Rev B 音频播放器 — Debian armhf
+ ZYBO Rev B audio player - Debian armhf
 
-  声卡   aplay -l            → card 0: ZyboSoundCard（48k / S32_LE）
-  音量   alsamixer -c 0      开机默认由 /var/lib/alsa/asound.state 恢复
-  播放   mpc add/play/status （曲库 /var/lib/mpd/music）
-  推送   shairport-sync 已在跑，手机 AirPlay 里选 zybo-audio
-  排查   journalctl -u mpd -f
+  sound card  aplay -l             -> card 0: ZyboSoundCard (48k / S32_LE)
+  volume      alsamixer -c 0       restored at boot from /var/lib/alsa/asound.state
+  playback    mpc add/play/status  (music library in /var/lib/mpd/music)
+  streaming   shairport-sync is running; pick zybo-audio from AirPlay
+  debug       journalctl -u mpd -f
 EOF
 
-# DNS：不引入 systemd-resolved，直接给静态 resolv.conf（够用且最少变量）
+# DNS: no systemd-resolved; a static resolv.conf is enough and keeps variables minimal
 cat > "$TARGET/etc/resolv.conf" <<'EOF'
 nameserver 223.5.5.5
 nameserver 1.1.1.1
 EOF
 
-# ── ALSA 默认设备：软件重采样到 48kHz（MCLK 固定 12.288MHz）────────────────
-# 格式必须 S32_LE：axi-i2s 在 DMA 模式下只暴露 S32_LE（上板验证）
+# --- ALSA default device: software resample to 48kHz (MCLK fixed at 12.288MHz) ---
+# The format must be S32_LE: in DMA mode axi-i2s only exposes S32_LE (verified on the board)
 cat > "$TARGET/etc/asound.conf" <<'EOF'
 pcm.!default {
     type plug
@@ -170,45 +182,50 @@ ctl.!default {
 }
 EOF
 
-# ── 开机音量：装一份 asound.state ─────────────────────────────────────────
-# 没有这个文件时 alsa-restore 无事可做，codec 就停在驱动默认（Master 95%，
-# 实测"耳朵要聋"）。这份文件是在板子上 `amixer sset Master 88% && alsactl store`
-# 抓回来的（card id = ZyboSoundCard，与板上 /sys/class/sound/card0/id 一致）。
-# 由 CI 通过环境变量 ZYBO_FILES 指向仓库 files/ 目录传入。
+# --- Boot volume: install an asound.state -----------------------------------
+# Without this file alsa-restore has nothing to do and the codec stays at the
+# driver default (Master 95%, painfully loud). This file was captured on the
+# board with `amixer sset Master 88% && alsactl store` (card id = ZyboSoundCard,
+# matching /sys/class/sound/card0/id on the board).
+# CI passes it in through the ZYBO_FILES environment variable, which points at
+# the repository's files/ directory.
 if [ -n "${ZYBO_FILES:-}" ] && [ -f "$ZYBO_FILES/asound.state" ]; then
     install -D -m 644 "$ZYBO_FILES/asound.state" "$TARGET/var/lib/alsa/asound.state"
     echo "[hook] installed asound.state (initial Master volume)"
 else
-    echo "[hook] WARN: ZYBO_FILES/asound.state 未提供，开机音量将用驱动默认值"
+    echo "[hook] WARN: ZYBO_FILES/asound.state not provided; boot volume will use the driver default"
 fi
 
-# ── root 密码（beta：出厂是公开的默认值，上板后请立刻改）──────────────────
-# 注意：这里写的是**明文默认口令**，任何拿到镜像的人都知道。
-# 所以这个镜像只适合可信局域网里自用；要发出去请：
-#   CI 里设 ZYBO_ROOT_PW=<随机值>，或者上板后 `passwd` 改掉。
+# --- root password (beta: the factory default is public, change it right after first boot) ---
+# NOTE: this writes a PLAINTEXT default password that anyone with the image knows.
+# The image is therefore only suitable for private use on a trusted LAN. To ship it:
+#   set ZYBO_ROOT_PW=<random value> in CI, or run `passwd` on the board.
 ROOT_PW="${ZYBO_ROOT_PW:-zybo}"
 chroot "$TARGET" chpasswd <<EOF
 root:${ROOT_PW}
 EOF
 if [ "${ZYBO_ROOT_PW:-}" = "" ]; then
-    echo "[hook] WARN: root 口令用的是默认值 'zybo'（可用 ZYBO_ROOT_PW 覆盖）"
+    echo "[hook] WARN: root password is the default 'zybo' (override with ZYBO_ROOT_PW)"
 fi
 
-# ── SSH host key：**不要烤进镜像** ────────────────────────────────────────
-# openssh-server 在安装时就生成了 host key，那意味着所有用同一份 CI 构建出来的
-# SD 卡**共用同一套主机密钥**（可被中间人冒名）。删掉，改由首次启动时生成：
-# ssh-keygen -A 只补缺的，幂等，不会覆盖已有密钥。
+# --- SSH host keys: do NOT bake them into the image -------------------------
+# openssh-server generates host keys at install time, which would mean every SD
+# card built by the same CI job shares one host key (impersonation risk). Delete
+# them so they are generated on first boot instead: ssh-keygen -A only fills in
+# missing keys, is idempotent and never overwrites existing ones.
 rm -f "$TARGET"/etc/ssh/ssh_host_*
 install -d "$TARGET/etc/systemd/system/ssh.service.d"
 cat > "$TARGET/etc/systemd/system/ssh.service.d/10-generate-host-keys.conf" <<'EOF'
-# 首次启动（或密钥缺失时）重新生成主机密钥，避免所有镜像共用同一套
+# Regenerate host keys on first boot (or whenever they are missing) so that no
+# two images share the same keys
 [Service]
 ExecStartPre=/usr/bin/ssh-keygen -A
 EOF
-echo "[hook] SSH host key 改为首次启动生成（镜像里不含）"
+echo "[hook] SSH host keys will be generated on first boot (not included in the image)"
 
-# ── MPD：显式走 ALSA default 设备（= 上面的 plug，48k/S32_LE）──────────────
-# 不用发行版默认配置：默认可能直接开 hw:0,0 并要硬件混音器，而我们的格式是 S32_LE。
+# --- MPD: use the ALSA default device explicitly (= the plug above, 48k/S32_LE) ---
+# Not the distro default config: that may open hw:0,0 directly and expect a
+# hardware mixer, while our format is S32_LE.
 cat > "$TARGET/etc/mpd.conf" <<'EOF'
 music_directory     "/var/lib/mpd/music"
 playlist_directory  "/var/lib/mpd/playlists"
@@ -222,7 +239,7 @@ user                "mpd"
 bind_to_address     "any"
 port                "6600"
 
-# 纯软件混音：不依赖 codec 的硬件混音器控制
+# Pure software mixing: does not rely on the codec's hardware mixer controls
 mixer_type          "software"
 volume_normalization "no"
 
@@ -236,8 +253,9 @@ EOF
 chroot "$TARGET" install -d -o mpd -g audio /var/lib/mpd/music /var/lib/mpd/playlists
 chroot "$TARGET" usermod -aG audio mpd || true
 
-# ── 启用服务 ──────────────────────────────────────────────────────────────
-# 串口 getty 由 systemd-getty-generator 依 console= 自动生成，无需手工建
+# --- Enable services --------------------------------------------------------
+# The serial getty is generated automatically by systemd-getty-generator from
+# console=; nothing needs to be created by hand
 WANT="$TARGET/etc/systemd/system/multi-user.target.wants"
 mkdir -p "$WANT"
 for u in ssh.service \

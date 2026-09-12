@@ -1,20 +1,26 @@
 # ============================================================================
-# build-debian-rootfs.yml — ZYBO (Zynq-7000, armhf) Debian rootfs 构建
+# build-debian-rootfs.yml — build the ZYBO (Zynq-7000, armhf) Debian rootfs
 # ============================================================================
-# 只构建用户空间（rootfs）；内核/DTB/U-Boot 复用 zybo-linux 与 zybo-buildroot 的产物。
-# 工具链：mmdebstrap + qemu-user-static（跨架构二阶段），无需 KVM。
-# 产物（artifact: debian-rootfs）：rootfs.ext4
-# 说明：
-#   - 默认 trixie（当前 stable，armhf 在初始发布架构内）；可切 bookworm（LTS）
-#   - iproute2/iputils-ping：mmdebstrap minbase 连 ip/ping 都没有，上板没法查网络
-#   - sox：板端生成测试音频（不用从主机推文件）
-#   - bluez：bluez-alsa 只是 ALSA 插件，没有 bluez 守护进程蓝牙根本起不来
-#   - nano/rsync/mpg123/usbutils/python3：板端编辑/传文件/快速验声/调试/写脚本
-#   - USB WiFi：wpasupplicant/iw/rfkill/wireless-regdb + 常见固件
-#     （firmware-realtek/mediatek/atheros/misc-nonfree）。内核侧驱动见 zybo-linux
-#     的 config.fragment（rtl8xxxu / rtw88 USB / mt7601u / mt76 / rt2800usb / ath9k_htc）。
-#   - mmdebstrap 默认不装 Recommends → 显式 --aptopt='Apt::Install-Recommends "true"'
-#   - hooks/ 内的脚本在 chroot 中执行：写 fstab/hostname/asound.conf、启用服务
+# Userspace (rootfs) only; kernel/DTB/U-Boot come from zybo-linux and zybo-buildroot.
+# Toolchain: mmdebstrap + qemu-user-static (cross-arch second stage), no KVM needed.
+# Artifacts (artifact: debian-rootfs): rootfs.ext4
+# Notes:
+#   - Defaults to trixie (current stable; armhf is one of the initial release
+#     architectures); bookworm (LTS) can be selected instead
+#   - iproute2/iputils-ping: mmdebstrap minbase has neither ip nor ping, so there is
+#     no way to inspect the network on the board
+#   - sox: generate test audio on the board (no need to push files from the host)
+#   - bluez: bluez-alsa is only an ALSA plugin; without the bluez daemon Bluetooth
+#     cannot come up at all
+#   - nano/rsync/mpg123/usbutils/python3: edit/transfer files, quick sound checks,
+#     debugging and scripting on the board
+#   - USB WiFi: wpasupplicant/iw/rfkill/wireless-regdb + common firmware
+#     (firmware-realtek/mediatek/atheros/misc-nonfree). Kernel-side drivers are in
+#     zybo-linux's config.fragment (rtl8xxxu / rtw88 USB / mt7601u / mt76 / rt2800usb / ath9k_htc).
+#   - mmdebstrap does not install Recommends by default, hence the explicit
+#     --aptopt='Apt::Install-Recommends "true"'
+#   - the scripts in hooks/ run inside the chroot: they write fstab/hostname/asound.conf
+#     and enable services
 # ============================================================================
 name: Build ZYBO Debian Rootfs
 
@@ -79,10 +85,10 @@ jobs:
           fi
           echo "suite=$SUITE"
           echo "packages=$PKGS"
-          # ZYBO_FILES 让 hook 能取到仓库 files/ 里的文件（如 asound.state）
-          # ⚠️ 必须显式带上 non-free-firmware：firmware-realtek/mediatek/atheros/
-          #    misc-nonfree 都在该组件里；只给 main 的话 mmdebstrap 直接找不到包
-          #    （实测踩过：构建 5 分钟就失败）。
+          # ZYBO_FILES lets the hooks reach files in the repository's files/ (e.g. asound.state)
+          # NOTE: non-free-firmware must be listed explicitly: firmware-realtek/mediatek/
+          #    atheros/misc-nonfree live in that component, and with only main mmdebstrap
+          #    simply fails to find the packages.
           sudo ZYBO_FILES="$PWD/files" mmdebstrap \
             --components=main,contrib,non-free,non-free-firmware \
             --architectures=armhf \
@@ -98,12 +104,13 @@ jobs:
       - name: Build ext4 image (optional, for dd)
         run: |
           mkdir -p rootfs-dir
-          # ⚠️ 解包与 mke2fs 必须在**同一个 fakeroot 会话**里：
-          # tar 的 chown 在 fakeroot 下只是"虚拟记录"，会话一结束就没了；分开写
-          # （fakeroot tar ... 然后 fakeroot mke2fs ...）会让 mke2fs 看到真实的
-          # 磁盘属主，结果 ext4 里所有非 root 属主全丢 —— 实测 /var/lib/mpd 变成
-          # root:root（mpd 用户写不了 tag_cache，MPD 起不来）、/etc/shadow 的
-          # shadow 组变 0。tar 本身是对的（102/29），坏的只有 ext4 这一步。
+          # NOTE: unpacking and mke2fs must run in the SAME fakeroot session:
+          # tar's chown is only a virtual record under fakeroot and is lost when the
+          # session ends, so running them separately (fakeroot tar ... then fakeroot
+          # mke2fs ...) makes mke2fs see the real on-disk ownership and every non-root
+          # owner is lost in the ext4 image -- /var/lib/mpd becomes root:root (the mpd
+          # user cannot write tag_cache and MPD fails to start) and the group of
+          # /etc/shadow becomes 0. tar itself is fine (102/29); only the ext4 step breaks.
           fakeroot -- sh -c '
             set -e
             tar -xpf rootfs.tar -C rootfs-dir
@@ -114,13 +121,13 @@ jobs:
 
       - name: Verify ownership survived into the ext4 image
         run: |
-          # 抽查几个非 root 属主：若这里报错，说明上面的 fakeroot 会话又被拆开了
+          # Spot-check a few non-root owners: if this fails, the fakeroot session above was split again
           check() { # check <path> <regex>
             if debugfs -R "stat $1" rootfs.ext4 2>/dev/null | grep -qE "$2"; then
               echo "  OK   $1  ($2)"
             else
               debugfs -R "stat $1" rootfs.ext4 2>/dev/null | grep -E 'User:|Group:|Mode:'
-              echo "::error::$1 的属主/权限没进 ext4（期望 $2）"
+              echo "::error::ownership/permissions of $1 did not reach ext4 (expected $2)"
               exit 1
             fi
           }
@@ -128,22 +135,22 @@ jobs:
           check /var/lib/mpd/music  'User: *102'
           check /etc/shadow         'Group: *42'
           check /usr/bin/sudo       'Mode: *04755'
-          echo "ext4 属主/权限保留正常"
+          echo "ext4 ownership/permissions preserved"
 
       - name: Verify defaults landed in the image
         run: |
-          check() { # check <path> <说明>
+          check() { # check <path> <description>
             if debugfs -R "stat $1" rootfs.ext4 >/dev/null 2>&1; then
               echo "  OK   $1  ($2)"
             else
-              echo "::error::镜像里缺 $1（$2）"
+              echo "::error::missing $1 in the image ($2)"
               exit 1
             fi
           }
-          check /etc/systemd/network/10-eth0.link  "网卡固定为 eth0"
-          check /var/lib/alsa/asound.state         "开机音量默认值"
-          check /etc/localtime                     "时区 Asia/Shanghai"
-          check /etc/motd                          "登录横幅"
+          check /etc/systemd/network/10-eth0.link  "interface pinned to eth0"
+          check /var/lib/alsa/asound.state         "initial volume"
+          check /etc/localtime                     "time zone Asia/Shanghai"
+          check /etc/motd                          "login banner"
 
       - name: Upload rootfs artifact
         uses: actions/upload-artifact@v4

@@ -1,21 +1,25 @@
 # ============================================================================
-# zybo-audio-web.service — ZYBO 音频播放器的网页面板后端
+# zybo-audio-web.service — web panel backend for the ZYBO audio player
 # ============================================================================
-# 由 zybo-debian 的 customize01-base.sh 安装到 /etc/systemd/system/ 并 enable。
+# Installed into the distro systemd directory and enabled by the zybo-debian rootfs hooks.
 #
-# 注意（不要"加固"掉的功能）：
-#   - 需要 /dev/mem：FPGA DSP 寄存器（CTRL/CIDX/CDAT/limiter）走 mmap 控制，
-#     所以**不能**加 PrivateDevices=yes / ProtectSystem=strict 这类沙箱。
-#   - 需要调用 amixer（音量）与 systemctl（起停音源服务），以及 reboot/poweroff。
-#   - PL 位流由 U-Boot 在 Linux 起来之前加载，所以本服务启动时 DSP 寄存器一定已在。
+# Note (features that must not be "hardened" away):
+#   - Requires /dev/mem: the FPGA DSP registers (CTRL/CIDX/CDAT/limiter) are
+#     controlled through mmap, so sandboxing options such as PrivateDevices=yes
+#     or ProtectSystem=strict must NOT be added.
+#   - Needs to call amixer (volume) and systemctl (start/stop source services),
+#     plus reboot/poweroff.
+#   - The PL bitstream is loaded by U-Boot before Linux starts, so the DSP
+#     registers are always present by the time this service starts.
 # ============================================================================
 [Unit]
 Description=ZYBO Audio web panel (EQ / limiter / volume / sources)
 Documentation=file:/usr/share/doc/zybo-audio/THIRD-PARTY.md
 After=network.target sound.target
 Wants=network.target
-# 崩溃时不要无限刷日志：5 分钟内超过 10 次就放弃，便于从 journal 看出来
-# （StartLimit* 属于 [Unit] 段 —— 放 [Service] 会被 systemd 忽略）
+# Do not flood the journal on crashes: give up after more than 10 starts within
+# 5 minutes, so the failure is easy to spot in the journal
+# (StartLimit* belong to [Unit] -- systemd ignores them in [Service])
 StartLimitIntervalSec=300
 StartLimitBurst=10
 
