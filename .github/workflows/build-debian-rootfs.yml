@@ -77,6 +77,41 @@ jobs:
         run: |
           ls /proc/sys/fs/binfmt_misc/ | grep -i qemu || sudo update-binfmts --enable qemu-arm
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: app/go.mod
+          cache-dependency-path: app/go.sum
+
+      - name: Build the backend from source (linux/arm)
+        run: |
+          cd app
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 \
+            go build -trimpath -ldflags="-s -w" -o ../files/zybo-audio-web ./backend
+          file ../files/zybo-audio-web
+          go version -m ../files/zybo-audio-web | head -5
+          # -trimpath gate: the released binary must not embed the checkout path
+          if grep -a -q -F "$GITHUB_WORKSPACE" ../files/zybo-audio-web; then
+            echo "::error::the built binary embeds the checkout path (missing -trimpath?)"
+            exit 1
+          fi
+          echo "OK: no build-machine paths in the binary"
+
+      - name: Stage the WebUI and the systemd unit from app/
+        run: |
+          install -Dm644 app/webui/index.html          files/webui/index.html
+          install -Dm644 app/webui/assets/favicon.svg  files/webui/favicon.svg
+          install -Dm644 app/zybo-audio-web.service    files/zybo-audio-web.service
+
+      - name: Generate files/SHA256SUMS
+        run: |
+          # The backend binary is built here, so the manifest is a build output and
+          # is uploaded as an artifact instead of being tracked in git.
+          ( cd files && sha256sum zybo-audio-web zybo-audio-web.service VERSION \
+                THIRD-PARTY.md webui/index.html webui/favicon.svg licenses/*.txt > SHA256SUMS )
+          ( cd files && sha256sum -c SHA256SUMS )
+          cat files/SHA256SUMS
+
       - name: Build rootfs (mmdebstrap -> tar + tar.zst)
         run: |
           PKGS="$BASE_PACKAGES"
@@ -151,6 +186,9 @@ jobs:
           check /var/lib/alsa/asound.state         "initial volume"
           check /etc/localtime                     "time zone Asia/Shanghai"
           check /etc/motd                          "login banner"
+          check /usr/local/bin/zybo-audio-web      "backend built from app/ sources"
+          check /var/www/zybo-audio/index.html     "WebUI staged from app/webui"
+          check /usr/share/doc/zybo-audio/THIRD-PARTY.md "third-party notices"
 
       - name: Upload rootfs artifact
         uses: actions/upload-artifact@v4
@@ -159,6 +197,16 @@ jobs:
           path: |
             rootfs.tar.zst
             rootfs.ext4
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload staged payload manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-files
+          path: |
+            files/SHA256SUMS
+            files/zybo-audio-web
           if-no-files-found: error
           retention-days: 14
 

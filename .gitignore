@@ -1,4 +1,14 @@
+# Root filesystem / SD-card build output -- never commit images or tarballs
 rootfs.ext4
 rootfs.tar
+rootfs.tar.zst
 sdcard.img
+*.img
+rootfs-dir/
+ci-rootfs*/
 mmdebstrap.log
+
+# Backend binary and checksum manifest: built by CI from app/ during the rootfs
+# build (see README), not tracked
+/files/zybo-audio-web
+/files/SHA256SUMS

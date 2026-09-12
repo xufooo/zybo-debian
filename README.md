@@ -17,10 +17,14 @@ here — they come from the sibling repositories and are combined on the SD card
 
 ## Layout
 
-- `.github/workflows/build-debian-rootfs.yml` — CI: rootfs tar plus ext4 image.
-- `files/` — app payload installed by `customize02`: `zybo-audio-web` (static
-  ARM backend) + systemd unit (port 8080), `webui/`, `asound.state`, `VERSION`,
-  `THIRD-PARTY.md`, `licenses/`, `SHA256SUMS`.
+- `.github/workflows/build-debian-rootfs.yml` — CI: builds the ARM backend from
+  `app/`, then the rootfs tar and the ext4 image.
+- `app/` — application sources: the Go backend (`backend/*.go`, `go.mod`),
+  the WebUI (`webui/`) and the systemd unit. CI compiles the backend with
+  `go build -trimpath` into `files/zybo-audio-web`; the binary is not tracked.
+- `files/` — app payload installed by `customize02`: the staged ARM backend
+  (built from `app/`), systemd unit (port 8080), `webui/`, `asound.state`,
+  `VERSION`, `THIRD-PARTY.md`, `licenses/` and a CI-generated `SHA256SUMS`.
 - `hooks/` — host-side mmdebstrap hooks: `customize01-base.sh` (base system),
   `customize02-app.sh` (payload), `customize03-shairport.sh` (AirPlay config);
   each must be executable and start with a stage prefix (`setup`, `extract`,
@@ -51,6 +55,15 @@ zstd -19 -T0 rootfs.tar -o rootfs.tar.zst
 `rootfs.ext4`, extract the tar and run `mke2fs -d` in one single `fakeroot`
 session, as the workflow does, so non-root ownership survives into the image.
 
+The backend binary is **not stored in this repository**. Build it before running
+`mmdebstrap`, exactly as CI does:
+
+```bash
+cd app
+CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 \
+    go build -trimpath -ldflags="-s -w" -o ../files/zybo-audio-web ./backend
+```
+
 ## Image configuration
 
 `hooks/customize01-base.sh` sets up networking (on-board GEM as `eth0` via
@@ -69,8 +82,13 @@ change it after the first boot; SSH host keys are generated on first boot.
 ## CI
 
 `.github/workflows/build-debian-rootfs.yml` is manual (`workflow_dispatch`) with
-the optional inputs `suite` and `extra_packages`. Artifacts: `debian-rootfs`
-(`rootfs.tar.zst`, `rootfs.ext4`) and `debian-build-log` on failure.
+the optional inputs `suite` and `extra_packages`. Before `mmdebstrap` it sets up
+Go, cross-compiles the backend from `app/` into `files/zybo-audio-web`, stages
+the WebUI from `app/webui/` and regenerates `files/SHA256SUMS` over the payload.
+The checksum manifest is therefore a build output (uploaded as the
+`debian-files` artifact), not a tracked file. Artifacts: `debian-rootfs`
+(`rootfs.tar.zst`, `rootfs.ext4`), `debian-files` (`SHA256SUMS`) and
+`debian-build-log` on failure.
 
 ## Assembling an SD card
 
@@ -108,11 +126,18 @@ wpa_passphrase "SSID" "passphrase" >> /etc/wpa_supplicant/wpa_supplicant.conf
 systemctl restart 'wpa_supplicant@*'
 ```
 
-## Licenses
+## Third-party licenses
 
 `files/THIRD-PARTY.md` lists the third-party components distributed in the image
 and `files/licenses/` holds their texts; `customize02` installs both under
 `/usr/share/doc/zybo-audio/`. Debian packages keep their own copyright files.
+
+## License
+
+This repository is licensed under the **GNU General Public License, version 2**
+(GPL-2.0); see [LICENSE](LICENSE) for the full text. It covers the hooks and
+scripts, the Go backend and the WebUI in `app/`. Third-party components keep
+their own licenses; see `files/THIRD-PARTY.md` and `files/licenses/`.
 
 ## Related repositories
 
