@@ -1,10 +1,11 @@
 # zybo-debian
 
-Debian armhf rootfs for a ZYBO (Zynq-7000) audio player.
-
-Builds a Debian armhf root filesystem with `mmdebstrap`, on GitHub Actions or on
-a local host. The kernel, device tree, U-Boot and PL bitstream are **not** built
-here — they come from the sibling repositories and are combined on the SD card.
+Debian rootfs build (mmdebstrap hooks + payload `files/` + the `app/` sources:
+Go backend and WebUI, compiled by CI) and SD-card assembly for a ZYBO (Zynq-7000)
+audio player. This repository does **not** contain Debian source — packages come
+from the Debian mirrors. The kernel, device tree, U-Boot and PL bitstream are
+**not** built here — they come from the sibling repositories and are combined on
+the SD card.
 
 ## What it builds
 
@@ -55,8 +56,7 @@ zstd -19 -T0 rootfs.tar -o rootfs.tar.zst
 `rootfs.ext4`, extract the tar and run `mke2fs -d` in one single `fakeroot`
 session, as the workflow does, so non-root ownership survives into the image.
 
-The backend binary is **not stored in this repository**. Build it before running
-`mmdebstrap`, exactly as CI does:
+The backend binary is not tracked; build it before `mmdebstrap`, as CI does:
 
 ```bash
 cd app
