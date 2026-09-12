@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#1a1a2e">
+<title>ZYBO Audio</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+       background:#0f0f1a;color:#e0e0e0;min-height:100vh;
+       display:flex;justify-content:center;padding:12px;
+       -webkit-tap-highlight-color:transparent}
+  .app{width:100%;max-width:420px;display:flex;flex-direction:column;gap:16px}
+
+  /* header */
+  .header{text-align:center;padding:4px 0;
+          font-size:13px;color:#9a9ab0;letter-spacing:2px;text-transform:uppercase}
+  .header #app-ver{font-size:10px;letter-spacing:1px;color:#8f95a8}
+
+  /* now-playing card */
+  .card{background:#1a1a2e;border-radius:14px;padding:16px;text-align:center}
+  .card .art{width:80px;height:80px;border-radius:12px;background:#25253e;
+             margin:0 auto 12px;display:flex;align-items:center;justify-content:center;
+             font-size:36px}
+  .card .title{font-size:16px;font-weight:600;margin-bottom:4px;
+                white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card .artist{font-size:13px;color:#999}
+  .card .source-badge{display:inline-block;margin-top:8px;padding:3px 10px;
+                       border-radius:12px;font-size:11px;font-weight:600;
+                       background:#25253e;color:#7c8aff}
+
+  /* source selector */
+  .source-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+  .src-btn{flex:1;min-width:70px;padding:10px 4px;border-radius:10px;
+            background:#1a1a2e;border:2px solid transparent;
+            color:#999;font-size:12px;font-weight:600;cursor:pointer;
+            transition:all .15s;text-align:center}
+  .src-btn.active{border-color:#7c8aff;color:#7c8aff;background:#1a1a3e}
+  .src-btn:active{transform:scale(.96)}
+  .src-btn:disabled{opacity:.35;cursor:not-allowed}
+  .src-btn:disabled:active{transform:none}
+
+  /* eq section */
+  .section-title{font-size:11px;color:#9a9ab0;letter-spacing:3px;
+                 text-transform:uppercase;text-align:center;margin-bottom:4px}
+  .eq-panel{background:#1a1a2e;border-radius:14px;padding:16px 12px}
+  .eq-sliders{display:flex;justify-content:space-between;gap:2px;height:140px}
+  .eq-col{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px}
+  /* Vertical sliders: rotate a horizontal slider by -90deg. The outer .track only
+     reserves space, so the slider's layout width is just 28px.
+     Do NOT reintroduce the old `width:120px + writing-mode:bt-lr +
+     -webkit-appearance:slider-vertical` hack: its layout width is still 120px, the
+     flex column stretches to 120px and 6 columns total 764px, which overflows on phones. */
+  .eq-col .track{position:relative;width:28px;height:120px}
+  .eq-col input[type=range]{position:absolute;top:50%;left:50%;
+       width:120px;height:28px;margin:0;
+       transform:translate(-50%,-50%) rotate(-90deg);
+       -webkit-appearance:none;appearance:none;background:transparent;outline:none}
+  .eq-col input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;
+       background:linear-gradient(to right,#25253e,#7c8aff)}
+  .eq-col input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;
+       width:24px;height:24px;border-radius:50%;background:#fff;
+       border:3px solid #7c8aff;box-shadow:0 2px 8px rgba(0,0,0,.3);margin-top:-9px}
+  .eq-col input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:#25253e}
+  .eq-col input[type=range]::-moz-range-progress{height:6px;border-radius:3px;background:#7c8aff}
+  .eq-col input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;
+       background:#fff;border:3px solid #7c8aff}
+  .eq-col .val{font-size:10px;color:#7c8aff;font-weight:600;
+               font-variant-numeric:tabular-nums}
+  .eq-col .lbl{font-size:10px;color:#9a9ab0}
+
+  /* presets */
+  .presets{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px}
+  .pst-btn{padding:8px 14px;min-height:32px;border-radius:8px;background:#25253e;
+            border:1px solid transparent;color:#999;font-size:11px;
+            font-weight:600;cursor:pointer;transition:all .15s}
+  .pst-btn.active{border-color:#7c8aff;color:#7c8aff}
+  .pst-btn:active{transform:scale(.96)}
+
+  /* volume */
+  .vol-row{display:flex;align-items:center;gap:10px;padding:4px 8px}
+  .vol-row .icon{font-size:22px}
+  .vol-row input[type=range]{flex:1;height:6px;border-radius:3px;background:#25253e;
+       -webkit-appearance:none;appearance:none;outline:none}
+  .vol-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;
+       width:24px;height:24px;border-radius:50%;background:#fff;
+       border:2px solid #7c8aff;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+  .vol-row input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:#25253e}
+  .vol-row input[type=range]::-moz-range-progress{height:6px;border-radius:3px;background:#7c8aff}
+  .vol-row input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;
+       background:#fff;border:2px solid #7c8aff}
+  .vol-row .pct{font-size:14px;font-weight:600;color:#7c8aff;min-width:36px;text-align:right}
+
+  /* status bar */
+  .status-bar{display:flex;justify-content:center;gap:16px;
+               font-size:10px;color:#8f95a8;padding:4px 0}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <div class="header">ZYBO Audio <span id="app-ver"></span></div>
+
+  <!-- Now Playing ─────────────────────────────────────── -->
+  <div class="card" id="now-playing">
+    <div class="art" id="art">🎵</div>
+    <div class="title" id="np-title">No source connected</div>
+    <div class="artist" id="np-artist">Select a source to start playing</div>
+    <div><span class="source-badge" id="source-badge">Idle</span></div>
+  </div>
+
+  <!-- Source Selector ─────────────────────────────────── -->
+  <div class="source-row" id="source-row">
+    <button class="src-btn active" data-src="idle"     id="src-idle">🛑 Stop</button>
+    <button class="src-btn"         data-src="airplay"  id="src-airplay">📱 AirPlay</button>
+    <button class="src-btn"         data-src="dlna"      id="src-dlna">🏠 DLNA</button>
+    <button class="src-btn"         data-src="bluetooth" id="src-bt">🎧 Bluetooth</button>
+  </div>
+
+  <!-- EQ Panel ────────────────────────────────────────── -->
+  <div class="eq-panel" id="eq-panel">
+    <div class="section-title">Equalizer</div>
+    <div class="eq-sliders" id="eq-sliders"></div>
+    <div class="presets" id="presets"></div>
+    <div style="display:flex;gap:6px;justify-content:center;margin-top:4px">
+      <button class="pst-btn" id="btn-import" title="Import REW/AutoEQ/JSON config">📥 Import</button>
+      <a class="pst-btn" id="btn-export" href="/api/dsp/export?format=rew" download style="text-decoration:none">📤 Export REW</a>
+      <input type="file" id="file-import" accept=".txt,.json" style="display:none">
+    </div>
+  </div>
+
+  <!-- Limiter ─────────────────────────────────────────── -->
+  <div class="section-title">Limiter (anti-clipping)</div>
+  <div class="vol-row">
+    <button class="pst-btn" id="lim-toggle">Limiter on</button>
+    <input type="range" id="lim-thr" min="-24" max="0" value="-1" step="0.5">
+    <span class="pct" id="lim-thr-val">-1.0 dBFS</span>
+  </div>
+
+  <!-- Volume ──────────────────────────────────────────── -->
+  <div class="section-title">Main volume</div>
+  <div class="vol-row">
+    <span class="icon">🔈</span>
+    <input type="range" id="vol-slider" min="0" max="100" value="80" step="1">
+    <span class="icon">🔊</span>
+    <span class="pct" id="vol-pct">80%</span>
+  </div>
+
+  <!-- System Status ───────────────────────────────────── -->
+  <div class="status-bar" id="status-bar">
+    <span>CPU <span id="sys-cpu">--</span>%</span>
+    <span>RAM <span id="sys-ram">--</span>MB</span>
+    <span>Uptime <span id="sys-uptime">--</span></span>
+  </div>
+
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────
+let state = {
+  source: 'idle', title:'', artist:'', album:'', playing:false, volume:80,
+  dsp:{ enabled:true, bypass:false, preset:'flat', bands:[] },
+  system:{ cpu_percent:0, mem_used_mb:0, uptime_sec:0 }
+};
+// 6 bands: frequencies must be >=60Hz (stability limit of the Q3.15 coefficients at 48kHz, see backend/dsp.go)
+const BAND_FREQS = [60,150,400,1000,3000,10000];
+const freqLabels = ['60','150','400','1k','3k','10k'];
+const presetNames = ['flat','rock','jazz','classical','vocal','bass'];
+const API = '';
+
+// ── DOM refs ──────────────────────────────────────────────────────────
+function $(id){ return document.getElementById(id) }
+function setText(id,t){ const e=$(id); if(e)e.textContent=t }
+
+// ── Fetch status ──────────────────────────────────────────────────────
+async function fetchStatus(){
+  try {
+    const r = await fetch(API+'/api/status');
+    if(!r.ok) return;
+    state = await r.json();
+    render();
+  } catch(e){}
+}
+
+// ── Connect WebSocket ─────────────────────────────────────────────────
+function connectWS(){
+  const proto = location.protocol==='https:'?'wss':'ws';
+  const ws = new WebSocket(proto+'://'+location.host+'/ws');
+  ws.onmessage = function(ev){
+    try {
+      state = JSON.parse(ev.data);
+      render();
+    } catch(e){}
+  };
+  ws.onclose = function(){ setTimeout(connectWS,2000) };
+}
+
+// ── Render ────────────────────────────────────────────────────────────
+function render(){
+  // now-playing
+  setText('np-title', state.title || (state.playing ? 'Playing...' : 'No source connected'));
+  setText('np-artist', state.artist ? state.artist+(state.album?' — '+state.album:'') :
+    (state.source==='idle'?'Select a source to start playing':state.source+' connected'));
+  $('source-badge').textContent = state.source==='idle' ? 'Idle' :
+    state.source==='airplay' ? 'AirPlay' : state.source==='dlna' ? 'DLNA' : 'Bluetooth';
+  $('source-badge').style.background = state.source==='idle'?'#25253e':'#2a2a4e';
+
+  // source buttons
+  ['idle','airplay','dlna','bluetooth'].forEach(function(s){
+    const el = $('src-'+s);
+    if(!el) return;
+    el.classList.toggle('active', state.source===s);
+    // Sources not packaged in this image are hidden entirely (a greyed-out button with a tooltip still looks clickable)
+    const avail = (s==='idle') || !state.sources || state.sources[s] !== false;
+    el.disabled = !avail;
+    el.style.display = avail ? '' : 'none';
+    el.title = avail ? '' : 'Source not installed in this image';
+  });
+
+  // volume
+  const vs = $('vol-slider');
+  if(vs && document.activeElement !== vs) vs.value = state.volume;
+  setText('vol-pct', state.volume+'%');
+
+  // EQ sliders
+  renderEQ();
+
+  // Version (a release reports its identity, making it easy to match against an image)
+  setText('app-ver', state.version ? 'v'+state.version : '');
+
+  // system
+  setText('sys-cpu', state.system.cpu_percent);
+  setText('sys-ram', state.system.mem_used_mb);
+  setText('sys-uptime', fmtUptime(state.system.uptime_sec));
+}
+
+// ── EQ Render ─────────────────────────────────────────────────────────
+function buildEQ(){
+  const container = $('eq-sliders');
+  container.innerHTML = '';
+  for(let i=0;i<6;i++){
+    const col = document.createElement('div');
+    col.className = 'eq-col';
+    col.innerHTML =
+      '<div class="track"><input type="range" min="-12" max="12" value="0" step="0.5" data-band="'+i+'"></div>'+
+      '<div class="val">0dB</div><div class="lbl">'+freqLabels[i]+'</div>';
+    container.appendChild(col);
+  }
+  // add input handlers
+  container.querySelectorAll('input').forEach(function(inp){
+    inp.addEventListener('input', function(){
+      const band = +this.dataset.band;
+      const dB = parseFloat(this.value);
+      this.closest('.eq-col').querySelector('.val').textContent =
+        (dB>=0?'+':'')+dB.toFixed(1)+'dB';
+      debounceEQ(band, dB);
+    });
+  });
+}
+
+let eqTimer = null;
+function debounceEQ(band, dB){
+  if(eqTimer) clearTimeout(eqTimer);
+  eqTimer = setTimeout(function(){
+    const freq = BAND_FREQS[band];
+    const q = 0.7;
+    fetch(API+'/api/dsp/eq/'+band, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({gain_db:dB, freq:freq, q:q})
+    }).catch(function(){});
+  }, 100);
+}
+
+function renderEQ(){
+  const sliders = document.querySelectorAll('#eq-sliders input');
+  sliders.forEach(function(inp){
+    const band = +inp.dataset.band;
+    if(state.dsp.bands && state.dsp.bands[band] && document.activeElement !== inp){
+      inp.value = state.dsp.bands[band].gain_db;
+      inp.closest('.eq-col').querySelector('.val').textContent =
+        (state.dsp.bands[band].gain_db>=0?'+':'')+state.dsp.bands[band].gain_db.toFixed(1)+'dB';
+    }
+  });
+}
+
+// ── Presets ───────────────────────────────────────────────────────────
+function buildPresets(){
+  const container = $('presets');
+  const labels = { flat:'Flat', rock:'Rock', jazz:'Jazz',
+                   classical:'Classical', vocal:'Vocal', bass:'Bass' };
+  presetNames.forEach(function(name){
+    const btn = document.createElement('button');
+    btn.className = 'pst-btn';
+    btn.textContent = labels[name] || name;
+    btn.dataset.preset = name;
+    btn.addEventListener('click', function(){
+      fetch(API+'/api/dsp/preset', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({name:name})
+      }).catch(function(){});
+    });
+    container.appendChild(btn);
+  });
+}
+
+function renderPresets(){
+  document.querySelectorAll('.pst-btn').forEach(function(btn){
+    btn.classList.toggle('active', btn.dataset.preset === state.dsp.preset);
+  });
+}
+
+// ── Source buttons ─────────────────────────────────────────────────────
+document.querySelectorAll('.src-btn').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    const src = this.dataset.src;
+    if(src === state.source) return;
+    fetch(API+'/api/source/select', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({source:src})
+    }).catch(function(){});
+  });
+});
+
+// ── Volume slider ──────────────────────────────────────────────────────
+$('vol-slider').addEventListener('input', function(){
+  const vol = +this.value;
+  setText('vol-pct', vol+'%');
+  clearTimeout(this._timer);
+  this._timer = setTimeout(function(){
+    fetch(API+'/api/volume', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({volume:vol})
+    }).catch(function(){});
+  }, 150);
+});
+
+// ── Limiter ───────────────────────────────────────────────────────────
+function pushLimiter(body){
+  fetch(API+'/api/dsp/limiter', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  }).catch(function(){});
+}
+
+$('lim-toggle').addEventListener('click', function(){
+  const cur = !!(state.dsp && state.dsp.limiter);
+  pushLimiter({ enabled: !cur });
+});
+
+$('lim-thr').addEventListener('input', function(){
+  const v = parseFloat(this.value);
+  setText('lim-thr-val', v.toFixed(1)+' dBFS');
+  clearTimeout(this._timer);
+  this._timer = setTimeout(function(){ pushLimiter({ thr_db: v }); }, 150);
+});
+
+function renderLimiter(){
+  const d = state.dsp || {};
+  const btn = $('lim-toggle');
+  if(btn){
+    btn.textContent = d.limiter ? 'Limiter on' : 'Limiter off';
+    btn.classList.toggle('active', !!d.limiter);
+  }
+  const thr = $('lim-thr');
+  if(thr && document.activeElement !== thr && typeof d.lim_thr_db === 'number'){
+    thr.value = d.lim_thr_db;
+    setText('lim-thr-val', d.lim_thr_db.toFixed(1)+' dBFS');
+  }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────
+function fmtUptime(sec){
+  if(!sec || sec<0) return '--';
+  const h = Math.floor(sec/3600);
+  const m = Math.floor((sec%3600)/60);
+  if(h>0) return h+'h'+m+'m';
+  return m+'m';
+}
+
+// ── Override render to include presets ─────────────────────────────────
+const _origRender = render;
+render = function(){
+  _origRender();
+  renderPresets();
+  renderLimiter();
+};
+
+// ── Init ───────────────────────────────────────────────────────────────
+buildEQ();
+buildPresets();
+
+// Import/Export buttons
+$('btn-import').addEventListener('click', function(){ $('file-import').click(); });
+$('file-import').addEventListener('change', function(){
+  const file = this.files[0];
+  if(!file) return;
+  const form = new FormData();
+  form.append('config', file);
+  fetch(API+'/api/dsp/import', { method:'POST', body: form })
+    .then(r => r.json())
+    .then(d => { alert('Imported: '+d.preset+' ('+d.bands+' bands)'); fetchStatus(); })
+    .catch(e => alert('Import failed: '+e));
+});
+
+fetchStatus();
+connectWS();
+</script>
+
+</body>
+</html>

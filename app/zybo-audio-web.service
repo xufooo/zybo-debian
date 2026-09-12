@@ -1,0 +1,36 @@
+# ============================================================================
+# zybo-audio-web.service — web panel backend for the ZYBO audio player
+# ============================================================================
+# Installed into the distro systemd directory and enabled by the zybo-debian rootfs hooks.
+#
+# Note (features that must not be "hardened" away):
+#   - Requires /dev/mem: the FPGA DSP registers (CTRL/CIDX/CDAT/limiter) are
+#     controlled through mmap, so sandboxing options such as PrivateDevices=yes
+#     or ProtectSystem=strict must NOT be added.
+#   - Needs to call amixer (volume) and systemctl (start/stop source services),
+#     plus reboot/poweroff.
+#   - The PL bitstream is loaded by U-Boot before Linux starts, so the DSP
+#     registers are always present by the time this service starts.
+# ============================================================================
+[Unit]
+Description=ZYBO Audio web panel (EQ / limiter / volume / sources)
+Documentation=file:/usr/share/doc/zybo-audio/THIRD-PARTY.md
+After=network.target sound.target
+Wants=network.target
+# Do not flood the journal on crashes: give up after more than 10 starts within
+# 5 minutes, so the failure is easy to spot in the journal
+# (StartLimit* belong to [Unit] -- systemd ignores them in [Service])
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/zybo-audio-web
+Environment=PORT=8080
+Restart=on-failure
+RestartSec=3
+User=root
+SyslogIdentifier=zybo-audio-web
+
+[Install]
+WantedBy=multi-user.target
