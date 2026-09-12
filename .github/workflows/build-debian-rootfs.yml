@@ -77,7 +77,7 @@ jobs:
         run: |
           ls /proc/sys/fs/binfmt_misc/ | grep -i qemu || sudo update-binfmts --enable qemu-arm
 
-      - name: Build rootfs (mmdebstrap → tar + tar.zst)
+      - name: Build rootfs (mmdebstrap -> tar + tar.zst)
         run: |
           PKGS="$BASE_PACKAGES"
           if [ -n "${{ github.event.inputs.extra_packages }}" ]; then
