@@ -42,6 +42,37 @@ ip -br addr show wl*        # 拿到 IP 就行
 > `firmware-misc-nonfree`（rt2800usb 等）。细节见 `audio_player` 的
 > `docs/TROUBLESHOOTING.md` §19。
 
+## 网页面板（后端 + WebUI）
+
+镜像里带 `zybo-audio-web`（Go 后端 + WebUI），由 **systemd 服务**管理、**开机自启**：
+
+| 装到哪 | 内容 |
+|---|---|
+| `/usr/local/bin/zybo-audio-web` | 后端二进制（静态 ARM） |
+| `/var/www/zybo-audio/` | WebUI（`index.html` + favicon） |
+| `/usr/lib/systemd/system/zybo-audio-web.service` | 服务单元（`enabled`） |
+| `/usr/share/doc/zybo-audio/` | 版本号 + 第三方许可清单与原文（合规） |
+
+面板地址：`http://<板子IP>:8080/`（板子开了 avahi，`http://zybo-audio.local:8080/` 也行）。
+
+**怎么进镜像**：产物由 `audio_player` 仓库摆进本仓库的 `files/`，再由 hook 安装：
+
+```bash
+# ① 在 audio_player 里构建并摆产物（含 SHA256SUMS）
+cd ../ZYBO/projects/audio_player && ./tools/stage_release.sh
+# ② 干跑验证（不需要 mmdebstrap，断言装出来的树）
+cd ../../zybo-debian && ./scripts/test_app_hook.sh
+# ③ 提交后 CI 重建 rootfs
+git add files/ && git commit -m 'app: <版本>' && git push
+```
+
+`files/` 里的东西（`asound.state` 之外都是上面脚本摆的）：
+`zybo-audio-web`、`zybo-audio-web.service`、`webui/`、`VERSION`、`THIRD-PARTY.md`、
+`licenses/*.txt`、`SHA256SUMS`。
+
+> ⚠️ 面板只是**控制器**：音源（shairport-sync / bluealsa）由它们的 systemd 单元负责，
+> 后端通过 `systemctl start/stop` 切换，自己不 spawn 进程。
+
 ## What it builds
 
 | Item | Value |
@@ -83,6 +114,17 @@ chroot directory as `$1`), and writes:
   expect a hardware mixer)
 - enabled `ssh`, `systemd-networkd`, `systemd-timesyncd`, `avahi-daemon`,
   `shairport-sync` and `mpd.socket`
+- `/etc/shairport-sync.conf` — `hooks/customize03-shairport.sh` pins the two
+  settings measured on the board: `general.interpolation = "basic"` (the default
+  `soxr` path costs 22.35 ms per ±1-frame correction on this 650 MHz A9 and burns
+  105% of a core; `basic` drops that to 16.5% with no audible difference) and
+  `general.audio_backend_buffer_desired_length_in_seconds = 1.0` (rides out WiFi
+  jitter; the queue then sits at ≈0.96 s instead of bottoming out at 0). It also
+  forces the diagnostic settings back to release values (`log_verbosity = 0`,
+  `statistics = "no"`) so troubleshooting leftovers can't ship. The hook edits an
+  existing config in place and creates one if missing — it never overwrites the
+  distro sample. Dry-run it with `./scripts/test_shairport_hook.sh` (no
+  mmdebstrap needed; 4 cases / 49 assertions).
 
 Hook scripts in `hooks/` must be executable and named with one of the
 mmdebstrap stage prefixes (`setup`, `extract`, `essential`, `customize`).
@@ -102,7 +144,11 @@ zybo-debian/
 ├── .github/workflows/build-debian-rootfs.yml
 ├── files/asound.state          # 板上抓取的 ALSA 开机默认值（音量）
 ├── hooks/customize01-base.sh   # host-side hook: fstab/网络/时区/asound.conf/mpd/服务
+├── hooks/customize02-app.sh    # host-side hook: 后端二进制 + WebUI + 许可
+├── hooks/customize03-shairport.sh  # host-side hook: AirPlay 发布配置（interpolation/buffer/诊断项）
 ├── scripts/make_sdcard.sh      # assemble a flashable sdcard.img
+├── scripts/test_app_hook.sh    # dry-run customize02 并断言装出来的树
+├── scripts/test_shairport_hook.sh  # dry-run customize03（4 用例 / 49 项断言）
 └── README.md
 ```
 

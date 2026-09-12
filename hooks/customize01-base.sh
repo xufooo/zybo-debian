@@ -182,10 +182,30 @@ else
     echo "[hook] WARN: ZYBO_FILES/asound.state 未提供，开机音量将用驱动默认值"
 fi
 
-# ── root 密码（开发用；首次登录后请修改）─────────────────────────────────
-chroot "$TARGET" chpasswd <<'EOF'
-root:zybo
+# ── root 密码（beta：出厂是公开的默认值，上板后请立刻改）──────────────────
+# 注意：这里写的是**明文默认口令**，任何拿到镜像的人都知道。
+# 所以这个镜像只适合可信局域网里自用；要发出去请：
+#   CI 里设 ZYBO_ROOT_PW=<随机值>，或者上板后 `passwd` 改掉。
+ROOT_PW="${ZYBO_ROOT_PW:-zybo}"
+chroot "$TARGET" chpasswd <<EOF
+root:${ROOT_PW}
 EOF
+if [ "${ZYBO_ROOT_PW:-}" = "" ]; then
+    echo "[hook] WARN: root 口令用的是默认值 'zybo'（可用 ZYBO_ROOT_PW 覆盖）"
+fi
+
+# ── SSH host key：**不要烤进镜像** ────────────────────────────────────────
+# openssh-server 在安装时就生成了 host key，那意味着所有用同一份 CI 构建出来的
+# SD 卡**共用同一套主机密钥**（可被中间人冒名）。删掉，改由首次启动时生成：
+# ssh-keygen -A 只补缺的，幂等，不会覆盖已有密钥。
+rm -f "$TARGET"/etc/ssh/ssh_host_*
+install -d "$TARGET/etc/systemd/system/ssh.service.d"
+cat > "$TARGET/etc/systemd/system/ssh.service.d/10-generate-host-keys.conf" <<'EOF'
+# 首次启动（或密钥缺失时）重新生成主机密钥，避免所有镜像共用同一套
+[Service]
+ExecStartPre=/usr/bin/ssh-keygen -A
+EOF
+echo "[hook] SSH host key 改为首次启动生成（镜像里不含）"
 
 # ── MPD：显式走 ALSA default 设备（= 上面的 plug，48k/S32_LE）──────────────
 # 不用发行版默认配置：默认可能直接开 hw:0,0 并要硬件混音器，而我们的格式是 S32_LE。
