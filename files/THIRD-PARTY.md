@@ -34,13 +34,18 @@ Comments in `saturator.v` and `fpga/src/hdl/dsp/volume_control.v` carry
 
 | Component | Version | License | Obligation |
 |---|---|---|---|
-| Linux kernel (Xilinx `linux-xlnx`) | 6.6.80, `zybo-linux` @ `e1b1ed6` | **GPL-2.0** | Distributing the binary (`uImage`) requires making the **corresponding source** available; the `zybo-linux` repository is that source |
-| U-Boot (SPL + `u-boot.img`) | see `zybo-buildroot` | **GPL-2.0+** | same as above |
+| Linux kernel (Xilinx `linux-xlnx`) | 6.6.80, `zybo-linux` @ `e1b1ed6` | **GPL-2.0** | Distributing the binary (inside the released `uImage`, a FIT carrying the kernel + DTB) requires making the **corresponding source** available; the `zybo-linux` repository is that source |
+| U-Boot (bundled inside the released `BOOT.BIN`, FSBL form) | see `zybo-buildroot` | **GPL-2.0+** | same as above; the `zybo-buildroot` repository is the source |
 | Debian trixie packages (shairport-sync **MIT**, mpd **GPL-2+**, wpasupplicant **BSD-3**, bluez-alsa-utils **Expat**, alsa-utils **GPL-2**, openssh-server, avahi, ...) | 2026-09 snapshot | respective | `/usr/share/doc/<pkg>/copyright` is kept in the image by the packages themselves; Debian's own compliance is maintained per package |
 | **Debian `non-free-firmware`**: `firmware-realtek` / `-mediatek` / `-atheros` / `-misc-nonfree` | `20250410-2` | vendor blobs (**non-free**, redistributable) | The documentation must **state that the image contains non-free firmware**; see each package's copyright for the exact terms |
 | Go runtime + standard library | go1.27.1 (statically linked into the backend binary) | **BSD-3-Clause**, Copyright (c) 2009 The Go Authors | Keep the notice (`licenses/Go-BSD-3-Clause.txt` + `Go-PATENTS.txt`) |
 | `github.com/gorilla/websocket` | v1.5.3 | **BSD-3-Clause**, Copyright (c) 2013 The Gorilla WebSocket Authors | Keep the notice (`licenses/gorilla-websocket-BSD-3-Clause.txt`) |
 | RBJ Audio EQ Cookbook (biquad coefficient formulas) | — | public reference (Robert Bristow-Johnson) | credited in the source comments (noted at the top of `backend/config.go`) |
+
+The released boot set is the **FSBL form**: `BOOT.BIN` bundles the FSBL + PL bitstream +
+U-Boot, and `uImage` is a FIT carrying the linux-xlnx kernel + DTB. The U-Boot SPL form
+(`boot.bin` + `u-boot.img` + a separate `zybo-audio.dtb` on the boot partition) is a
+historical/optional path and is not part of the release.
 
 Dependencies of the backend binary can be verified with Go's built-in metadata:
 
