@@ -9,7 +9,7 @@
 
 | | Status |
 |---|---|
-| Kernel / U-Boot / Go backend / Debian packages | ✅ obligations understood, compliant |
+| Kernel / U-Boot / Go backend / Debian packages | ✅ obligations understood, compliant; the GPL-2.0 / LGPL-2.1 / MIT texts are shipped in the image (§2) |
 | Digilent's own VHDL (wrapper, DMA FIFO) | ✅ MIT, keep the notice |
 | **6 ADI-derived VHDL files** | ⚠️ **dual-licensed: GPL-2.0 or ADI-BSD (the latter is venue-restricted)**; the vendored copy is an older revision carrying only ADI-BSD -> see §4 |
 | Our own code | ⚠️ **no license chosen yet** (see §6) |
@@ -36,8 +36,8 @@ Comments in `saturator.v` and `fpga/src/hdl/dsp/volume_control.v` carry
 |---|---|---|---|
 | Linux kernel (Xilinx `linux-xlnx`) | 6.6.80, `zybo-linux` @ `e1b1ed6` | **GPL-2.0** | Distributing the binary (inside the released `uImage`, a FIT carrying the kernel + DTB) requires making the **corresponding source** available; the `zybo-linux` repository is that source |
 | U-Boot (bundled inside the released `BOOT.BIN`, FSBL form) | see `zybo-buildroot` | **GPL-2.0+** | same as above; the `zybo-buildroot` repository is the source |
-| Debian trixie packages (shairport-sync **MIT**, mpd **GPL-2+**, wpasupplicant **BSD-3**, bluez-alsa-utils **Expat**, alsa-utils **GPL-2**, openssh-server, avahi, ...) | 2026-09 snapshot | respective | `/usr/share/doc/<pkg>/copyright` is kept in the image by the packages themselves; Debian's own compliance is maintained per package |
-| **Debian `non-free-firmware`**: `firmware-realtek` / `-mediatek` / `-atheros` / `-misc-nonfree` | `20250410-2` | vendor blobs (**non-free**, redistributable) | The documentation must **state that the image contains non-free firmware**; see each package's copyright for the exact terms |
+| Debian trixie packages (shairport-sync **MIT**, mpd **GPL-2+**, wpasupplicant **BSD-3**, bluez-alsa-utils **Expat**, alsa-utils **GPL-2**, openssh-server, avahi **LGPL-2.1+**, ...) | trixie snapshot 2026-09 | respective | The image ships the texts we owe ourselves: `licenses/GPL-2.0.txt`, `licenses/LGPL-2.1.txt`, `licenses/shairport-sync-MIT.txt` (see the table below). Every package's own `/usr/share/doc/<pkg>/copyright` is kept in the image by the package itself |
+| **Debian `non-free-firmware`**: `firmware-realtek` / `-mediatek` / `-atheros` / `-misc-nonfree` | `20250410-2` | vendor blobs (**non-free**, redistributable) | The image ships `licenses/non-free-firmware-NOTICE.txt`, which **states that the image contains non-free firmware**; the per-blob terms are in each package's own copyright |
 | Go runtime + standard library | go1.27.1 (statically linked into the backend binary) | **BSD-3-Clause**, Copyright (c) 2009 The Go Authors | Keep the notice (`licenses/Go-BSD-3-Clause.txt` + `Go-PATENTS.txt`) |
 | `github.com/gorilla/websocket` | v1.5.3 | **BSD-3-Clause**, Copyright (c) 2013 The Gorilla WebSocket Authors | Keep the notice (`licenses/gorilla-websocket-BSD-3-Clause.txt`) |
 | RBJ Audio EQ Cookbook (biquad coefficient formulas) | — | public reference (Robert Bristow-Johnson) | credited in the source comments (noted at the top of `backend/config.go`) |
@@ -46,6 +46,20 @@ The released boot set is the **FSBL form**: `BOOT.BIN` bundles the FSBL + PL bit
 U-Boot, and `uImage` is a FIT carrying the linux-xlnx kernel + DTB. The U-Boot SPL form
 (`boot.bin` + `u-boot.img` + a separate `zybo-audio.dtb` on the boot partition) is a
 historical/optional path and is not part of the release.
+
+### License texts shipped in `/usr/share/doc/zybo-audio/licenses/`
+
+Every text is a verbatim copy; the provenance (component -> license -> source) is:
+
+| File | Covers | Source (version) |
+|---|---|---|
+| `licenses/GPL-2.0.txt` | U-Boot inside `BOOT.BIN`; linux-xlnx inside `uImage`; mpd; alsa-utils; the GPL-2.0 parts of the firmware packages | `u-boot` `v2024.01`, file `Licenses/gpl-2.0.txt` -- the same GPL-2.0 text that linux-xlnx `LICENSES/preferred/GPL-2.0` refers to |
+| `licenses/LGPL-2.1.txt` | avahi-daemon / libavahi*; the LGPL-2+ parts of alsa-utils | Debian `base-files` `13.8+deb13u6`, `/usr/share/common-licenses/LGPL-2.1` |
+| `licenses/shairport-sync-MIT.txt` | shairport-sync `4.3.7-1` (MIT; the package also bundles small ISC and BSD-3-Clause parts, documented in its own copyright) | Debian `shairport-sync` `4.3.7-1`, `/usr/share/doc/shairport-sync/copyright` (upstream: `github.com/mikebrady/shairport-sync`) |
+| `licenses/non-free-firmware-NOTICE.txt` | the non-free firmware blobs listed above | written for this release; the per-blob texts stay in `/usr/share/doc/firmware-*/copyright` |
+| `licenses/Go-BSD-3-Clause.txt`, `licenses/Go-PATENTS.txt` | Go runtime + standard library | the Go distribution |
+| `licenses/gorilla-websocket-BSD-3-Clause.txt` | `github.com/gorilla/websocket` v1.5.3 | upstream `LICENSE` |
+| `licenses/Digilent-MIT.txt`, `licenses/ADI-BSD-i2s-controller.txt`, `licenses/ZedEQ-MIT.txt` | RTL distributed in the bitstream (see §1) | see §1 |
 
 Dependencies of the backend binary can be verified with Go's built-in metadata:
 

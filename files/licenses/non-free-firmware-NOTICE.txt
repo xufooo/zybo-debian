@@ -1,0 +1,20 @@
+Non-free firmware notice
+========================
+
+The released rootfs image contains binary firmware blobs from the Debian
+non-free-firmware component, installed by these packages:
+
+  firmware-realtek        20250410-2
+  firmware-mediatek       20250410-2
+  firmware-atheros        20250410-2
+  firmware-misc-nonfree   20250410-2
+
+These blobs are redistributable, but they are not free software: their
+licenses are vendor binary-redistribution terms, are not OSI-approved and
+some forbid reverse engineering. They are required by the USB WiFi adapters
+the board supports (rtl8xxxu / rtw88 / mt76 / mt7601u / rt2800usb /
+ath9k_htc), so they are part of the release.
+
+The complete per-blob license texts and copyright notices are shipped with
+each package inside the image at:
+  /usr/share/doc/<package>/copyright
