@@ -9,6 +9,10 @@
 #     architectures); bookworm (LTS) can be selected instead
 #   - iproute2/iputils-ping: mmdebstrap minbase has neither ip nor ping, so there is
 #     no way to inspect the network on the board
+#   - libasound2-plugins: the only way to get a decent sample-rate converter. Without
+#     it alsa-lib falls back to its built-in "linear" interpolation (~41 dB SNR on
+#     44.1 kHz material, measured); the ffmpeg converter this package brings in measures
+#     ~86 dB SNR at ~6% CPU on the 650 MHz Cortex-A9. See hooks/customize01-base.sh.
 #   - sox: generate test audio on the board (no need to push files from the host)
 #   - bluez: bluez-alsa is only an ALSA plugin; without the bluez daemon Bluetooth
 #     cannot come up at all
@@ -42,7 +46,7 @@ concurrency:
 
 env:
   SUITE: ${{ github.event.inputs.suite || 'trixie' }}
-  BASE_PACKAGES: "systemd,systemd-sysv,systemd-timesyncd,alsa-utils,sox,mpd,mpc,shairport-sync,avahi-daemon,avahi-utils,bluez,bluez-alsa-utils,libasound2-plugin-bluez,i2c-tools,iproute2,iputils-ping,openssh-server,sudo,curl,ca-certificates,locales,tzdata,nano,rsync,mpg123,usbutils,python3,wpasupplicant,iw,rfkill,wireless-regdb,firmware-realtek,firmware-mediatek,firmware-atheros,firmware-misc-nonfree"
+  BASE_PACKAGES: "systemd,systemd-sysv,systemd-timesyncd,alsa-utils,libasound2-plugins,sox,mpd,mpc,shairport-sync,avahi-daemon,avahi-utils,bluez,bluez-alsa-utils,libasound2-plugin-bluez,i2c-tools,iproute2,iputils-ping,openssh-server,sudo,curl,ca-certificates,locales,tzdata,nano,rsync,mpg123,usbutils,python3,wpasupplicant,iw,rfkill,wireless-regdb,firmware-realtek,firmware-mediatek,firmware-atheros,firmware-misc-nonfree"
 
 jobs:
   build:

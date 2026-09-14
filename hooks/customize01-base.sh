@@ -165,7 +165,20 @@ EOF
 
 # --- ALSA default device: software resample to 48kHz (MCLK fixed at 12.288MHz) ---
 # The format must be S32_LE: in DMA mode axi-i2s only exposes S32_LE (verified on the board)
+#
+# Rate converter: without libasound2-plugins the only converter available is alsa-lib's
+# built-in "linear" interpolation, which costs about 41 dB of SNR on 44.1 kHz material
+# (measured against a high-precision soxr reference). libasound2-plugins provides
+# ffmpeg's polyphase resampler, measured at ~86 dB SNR for ~6% CPU on this 650 MHz
+# Cortex-A9, so every 44.1 kHz source (AirPlay, Bluetooth, mpd) gets a transparent
+# conversion instead of a 7-bit one.
+# The alternatives were measured and rejected: samplerate_best and speexrate_best
+# cannot keep up in real time (3.0x / 1.4x the audio duration, i.e. they underrun),
+# samplerate_medium costs ~42% CPU, and samplerate_linear is no better than the
+# built-in linear converter.
 cat > "$TARGET/etc/asound.conf" <<'EOF'
+defaults.pcm.rate_converter "lavrate_high"
+
 pcm.!default {
     type plug
     slave {
