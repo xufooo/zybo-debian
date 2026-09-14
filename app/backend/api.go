@@ -28,6 +28,10 @@ type DSPStatus struct {
 	Enabled     bool         `json:"enabled"`
 	Bypass      bool         `json:"bypass"`
 	Preset      string       `json:"preset"`
+	// PreampDB is the headroom compensation actually folded into the coefficients
+	// (dB, <=0): when the EQ boosts, this much is taken off so the cascade stays
+	// within 0 dBFS (see headroom.go). 0 means no compensation was needed.
+	PreampDB float64 `json:"preamp_db"`
 	BandsActive int          `json:"bands_active"`
 	Limiter     bool         `json:"limiter"`
 	LimThrDB    float64      `json:"lim_thr_db"`

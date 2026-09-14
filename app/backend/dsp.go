@@ -96,7 +96,6 @@ var (
 	dspLimiterAttMs   = limDefaultAttMs
 	dspLimiterRelMs   = limDefaultRelMs
 
-	preampWarned bool
 )
 
 var errDSPUnavailable = errors.New("DSP unavailable (/dev/mem not mapped or IP not present)")
@@ -104,8 +103,9 @@ var errDSPUnavailable = errors.New("DSP unavailable (/dev/mem not mapped or IP n
 // ── Presets (6 bands, frequencies map one-to-one to the WebUI sliders) ─────────
 //
 // Frequency layout: 60 / 150 / 400 / 1k / 3k / 10k Hz —— all ≥ minBandFreq.
-// PreampDB is kept in the struct for import/export, but the new hardware has no separate
-// preamp gain stage: use the volume (ALSA Master) for static gain, the limiter catches dynamic overload, so all values here are 0.
+// PreampDB is the preset's own preamp (common in REW/AutoEQ exports). The hardware
+// has no separate preamp stage, so dspFinalCoeffs folds it into the coefficients as
+// part of the automatic headroom calculation (see headroom.go).
 
 type slotConfig struct {
 	Type   string // "PK","LS","HS","LP","HP","NO","BP","AP","off"
@@ -149,7 +149,10 @@ var presets = map[string]eqPreset{
 
 var (
 	currentSlots    [maxHardwareBands]slotConfig
-	currentPreampDB float64
+	currentPreampDB float64 // preamp requested by the user or the preset (dB)
+	// currentPreampAppliedDB is what actually went into the coefficients (dB, <=0):
+	// the automatic headroom compensation, reported through the status API
+	currentPreampAppliedDB float64
 )
 
 // ── mmap / register access ───────────────────────────────────────────
@@ -275,15 +278,15 @@ func dspSetMasterVolume(vol float64) error {
 
 // dspSetPreamp likewise has no separate gain stage. Imported REW/AutoEQ presets often carry
 // a Preamp value: only one log line is emitted here — volume handles static gain, the limiter catches overloads.
+// dspSetPreamp sets the preamp (linear gain). The hardware has no separate preamp
+// stage, so it is folded into the coefficients (see dspFinalCoeffs); the value that
+// takes effect is min(this, -(peak gain of the EQ)), keeping the cascade within 0 dBFS.
 func dspSetPreamp(gain float64) error {
-	if gain > 0.999 && gain < 1.001 {
+	if gain <= 0 {
 		return nil
 	}
-	if !preampWarned {
-		preampWarned = true
-		log.Printf("preamp %.2f not applied: the new hardware has no separate preamp stage (volume handles static gain, the limiter catches overloads)", gain)
-	}
-	return nil
+	currentPreampDB = 20 * math.Log10(gain)
+	return dspWriteAllBands()
 }
 
 // ── Limiter ─────────────────────────────────────────────────────────
@@ -479,7 +482,7 @@ func designBiquad(sc slotConfig) (int32, int32, int32, int32, int32, error) {
 	return b0, b1, b2, a1, a2, nil
 }
 
-// dspSetSlot configures one band. band is 0..5, matching the WebUI slider order.
+// dspSetSlot configures one band. band is 0..5, matching the WebUI sliders.
 func dspSetSlot(band int, sc slotConfig) error {
 	if !dspAvailable {
 		return errDSPUnavailable
@@ -489,19 +492,74 @@ func dspSetSlot(band int, sc slotConfig) error {
 	}
 
 	if isBandOff(sc.Type) {
-		// unity coefficients = exact passthrough (y = 32768·x >> 15 = x); the band mapping is unchanged
-		dspWriteBand(band, qOne, 0, 0, 0, 0)
 		currentSlots[band] = slotConfig{Type: "off"}
-		return dspWriteCtrl()
+	} else {
+		sc = sanitizeBand(sc)
+		// Dry-run the design first: a coefficient out of range (frequency/gain too
+		// extreme) must be reported to the API, not silently written as a pass-through
+		if _, _, _, _, _, err := designBiquad(sc); err != nil {
+			return fmt.Errorf("band %d: %w", band, err)
+		}
+		currentSlots[band] = sc
+	}
+	// One band changed, so the headroom of the whole chain changed: rewrite all of it
+	// (30 registers, negligible cost)
+	return dspWriteAllBands()
+}
+
+// dspFinalCoeffs returns the Q3.15 coefficients that finally go to the hardware
+// (headroom compensation included), plus the preamp actually applied (dB, <=0).
+func dspFinalCoeffs() ([maxHardwareBands][coefPerBand]int32, float64) {
+	var out [maxHardwareBands][coefPerBand]int32
+	for i := 0; i < maxHardwareBands; i++ {
+		sc := currentSlots[i]
+		out[i] = [coefPerBand]int32{qOne, 0, 0, 0, 0}
+		if isBandOff(sc.Type) {
+			continue
+		}
+		if b0, b1, b2, a1, a2, err := designBiquad(sanitizeBand(sc)); err == nil {
+			out[i] = [coefPerBand]int32{b0, b1, b2, a1, a2}
+		}
 	}
 
-	sc = sanitizeBand(sc)
-	b0, b1, b2, a1, a2, err := designBiquad(sc)
-	if err != nil {
-		return fmt.Errorf("band %d: %w", band, err)
+	pre := effectivePreampDB(cascadeMaxGainDB(out), currentPreampDB)
+	if pre < -0.005 {
+		// Scale the numerator of the *first active band* only: mathematically that is a
+		// preamp at the input of the chain. Spreading it over every band would lower the
+		// overall gain too, but each stage would keep almost all of its own gain, so a
+		// full-scale input would still clip the first stage.
+		// One calculation, no iterative deepening -- see headroom.go.
+		for i := 0; i < maxHardwareBands; i++ {
+			if isBandOff(currentSlots[i].Type) {
+				continue
+			}
+			g := math.Pow(10, pre/20)
+			for k := 0; k < 3; k++ { // numerator only; a1/a2 are the poles and shape the response
+				v := int32(math.Round(float64(out[i][k]) * g))
+				if v > coefMax {
+					v = coefMax
+				} else if v < coefMin {
+					v = coefMin
+				}
+				out[i][k] = v
+			}
+			break
+		}
 	}
-	dspWriteBand(band, b0, b1, b2, a1, a2)
-	currentSlots[band] = sc
+	return out, pre
+}
+
+// dspWriteAllBands writes all six bands and updates CTRL.
+func dspWriteAllBands() error {
+	if !dspAvailable {
+		return errDSPUnavailable
+	}
+	coefs, pre := dspFinalCoeffs()
+	currentPreampAppliedDB = pre
+	for i := 0; i < maxHardwareBands; i++ {
+		c := coefs[i]
+		dspWriteBand(i, c[0], c[1], c[2], c[3], c[4])
+	}
 	return dspWriteCtrl()
 }
 
@@ -522,31 +580,31 @@ func dspApplyPreset(name string) error {
 		return errDSPUnavailable
 	}
 	for i, sc := range p.Slots {
-		if err := dspSetSlot(i, sc); err != nil {
+		if isBandOff(sc.Type) {
+			currentSlots[i] = slotConfig{Type: "off"}
+			continue
+		}
+		s := sanitizeBand(sc)
+		if _, _, _, _, _, err := designBiquad(s); err != nil {
 			return fmt.Errorf("preset %s band %d: %w", name, i+1, err)
 		}
+		currentSlots[i] = s
 	}
-	if p.PreampDB != 0 {
-		dspSetPreamp(math.Pow(10.0, p.PreampDB/20.0))
-	}
+	// A preset's own Preamp (common in REW/AutoEQ exports) now takes part in the
+	// headroom calculation instead of being logged and dropped
 	currentPreampDB = p.PreampDB
-	return nil
+	return dspWriteAllBands()
 }
 
 // ── Self-check ──────────────────────────────────────────────────────
 
-// dspExpectedCoeffs computes the expected value of all 30 coefficients from the current software state, for readback verification.
+// dspExpectedCoeffs computes the 30 coefficients the current software state implies,
+// for the read-back self test.
 func dspExpectedCoeffs() []int32 {
+	coefs, _ := dspFinalCoeffs()
 	out := make([]int32, coefTotal)
-	for band := 0; band < maxHardwareBands; band++ {
-		sc := currentSlots[band]
-		vals := [coefPerBand]int32{qOne, 0, 0, 0, 0}
-		if !isBandOff(sc.Type) {
-			if b0, b1, b2, a1, a2, err := designBiquad(sanitizeBand(sc)); err == nil {
-				vals = [coefPerBand]int32{b0, b1, b2, a1, a2}
-			}
-		}
-		copy(out[band*coefPerBand:], vals[:])
+	for i := 0; i < maxHardwareBands; i++ {
+		copy(out[i*coefPerBand:], coefs[i][:])
 	}
 	return out
 }
@@ -586,6 +644,7 @@ func dspStatusSnapshot() DSPStatus {
 		Enabled:     dspEnabled,
 		Bypass:      dspBypass,
 		Preset:      currentPreset,
+		PreampDB:    currentPreampAppliedDB,
 		BandsActive: dspActiveBands(),
 		Limiter:     dspLimiterEnabled,
 		LimThrDB:    dspLimiterThrDB,
