@@ -35,12 +35,14 @@ cnt() { # cnt <description> <file> <key> <expected count>
     if [ "$n" -eq "$4" ]; then ok "$1"; else bad "$1 ($3 appears $n times, expected $4)"; fi
 }
 
-# Shared assertions for the four release settings
+# Shared assertions for the six release settings
 assert_release() { # assert_release <case name> <file>
     has "$1: interpolation=basic"      "$2" '^[[:space:]]*interpolation[[:space:]]*=[[:space:]]*"basic"[[:space:]]*;'
     has "$1: buffer=1.0"               "$2" '^[[:space:]]*audio_backend_buffer_desired_length_in_seconds[[:space:]]*=[[:space:]]*1\.0[[:space:]]*;'
     has "$1: log_verbosity=0"          "$2" '^[[:space:]]*log_verbosity[[:space:]]*=[[:space:]]*0[[:space:]]*;'
     has "$1: statistics=no"            "$2" '^[[:space:]]*statistics[[:space:]]*=[[:space:]]*"no"[[:space:]]*;'
+    has "$1: mixer_control_name=Master" "$2" '^[[:space:]]*mixer_control_name[[:space:]]*=[[:space:]]*"Master"[[:space:]]*;'
+    has "$1: volume_max_db=0.0"        "$2" '^[[:space:]]*volume_max_db[[:space:]]*=[[:space:]]*0(\.0)?[[:space:]]*;'
     nhas "$1: no verbosity=3"          "$2" '^[[:space:]]*log_verbosity[[:space:]]*=[[:space:]]*3'
     nhas "$1: no statistics=yes"       "$2" '^[[:space:]]*statistics[[:space:]]*=[[:space:]]*"yes"'
     nhas "$1: no log_output_to=stderr" "$2" '^[[:space:]]*log_output_to[[:space:]]*=[[:space:]]*"stderr"'
@@ -48,6 +50,8 @@ assert_release() { # assert_release <case name> <file>
     cnt  "$1: buffer unique"          "$2" 'audio_backend_buffer_desired_length_in_seconds' 1
     cnt  "$1: log_verbosity unique"   "$2" 'log_verbosity' 1
     cnt  "$1: statistics unique"      "$2" 'statistics' 1
+    cnt  "$1: mixer_control_name unique" "$2" 'mixer_control_name' 1
+    cnt  "$1: volume_max_db unique"   "$2" 'volume_max_db' 1
 }
 
 # --- Case A: config file missing -> create -----------------------------------
@@ -102,6 +106,12 @@ general =
 {
 	audio_backend_buffer_desired_length_in_seconds = 1.0;
 	interpolation = "auto";
+	volume_max_db = -6.0;
+};
+
+alsa =
+{
+	mixer_control_name = "PCM";
 };
 
 diagnostics =
@@ -113,6 +123,9 @@ log_verbosity = 3;
 DIRTY
 sh "$HOOK" "$C" > "$T/c.log" 2>&1 || { bad "hook exited non-zero"; cat "$T/c.log"; }
 assert_release "C" "$C/etc/shairport-sync.conf"
+# The dirty values must be replaced, not appended (a duplicate key makes libconfig refuse the file)
+nhas "C: dirty mixer control replaced" "$C/etc/shairport-sync.conf" '^[[:space:]]*mixer_control_name[[:space:]]*=[[:space:]]*"PCM"'
+nhas "C: dirty volume ceiling replaced" "$C/etc/shairport-sync.conf" '^[[:space:]]*volume_max_db[[:space:]]*=[[:space:]]*-6'
 
 # --- Case D: idempotency (same file run twice gives the same result) ---------
 echo "== D. idempotency =="

@@ -89,7 +89,9 @@ func statusPusher(hub *wsHub, sm *sourceManager) {
 			Artist:  currentArtist,
 			Album:   currentAlbum,
 			Playing: currentPlaying,
-			Volume:  currentVolume,
+			// Read the mixer back: shairport-sync (AirPlay) and bluealsa-aplay
+			// (Bluetooth) move the same control, so the UI must follow them.
+			Volume:  readSystemVolume(currentVolume),
 			DSP:     dspStatusSnapshot(),
 			System:  getSystemStatus(),
 			Sources: sourceStates(),

@@ -83,7 +83,9 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 		Artist:  currentArtist,
 		Album:   currentAlbum,
 		Playing: currentPlaying,
-		Volume:  currentVolume,
+		// Read the mixer back: shairport-sync (AirPlay) and bluealsa-aplay
+		// (Bluetooth) move the same control, so the UI must follow them.
+		Volume:  readSystemVolume(currentVolume),
 		DSP:     dspStatusSnapshot(),
 		System:  getSystemStatus(),
 		Sources: sourceStates(),
@@ -287,7 +289,8 @@ func handleVolume(w http.ResponseWriter, r *http.Request) {
 		body.Volume = 100
 	}
 
-	// ALSA volume: amixer sset Master <vol>%
+	// ALSA volume: amixer sset Master <vol>% — the single system volume knob
+	// (see volume.go; shairport-sync and bluealsa-aplay write the same control)
 	volPercent := strconv.Itoa(body.Volume) + "%"
 	exec.Command("amixer", "sset", "Master", volPercent).Run()
 
@@ -296,6 +299,7 @@ func handleVolume(w http.ResponseWriter, r *http.Request) {
 		log.Printf("DSP volume: %v", err)
 	}
 	currentVolume = body.Volume
+	noteSystemVolume(body.Volume)
 	w.WriteHeader(http.StatusOK)
 }
 

@@ -62,6 +62,19 @@ general =
 	interpolation = "basic";
 	// linear interpolation is nearly free and a +/-1 frame correction is inaudible; the 0.2s default buffer underruns under WiFi jitter.
 	audio_backend_buffer_desired_length_in_seconds = 1.0;
+	// One system volume: the AirPlay volume drives the codec's ALSA "Master" control
+	// (see the alsa section below), never that control's +5 dB top end -- the DSP
+	// limiter sits *before* the codec, so anything above 0 dB would clip.
+	volume_max_db = 0.0;
+};
+
+alsa =
+{
+	// The single system volume knob: with mixer_control_name set, shairport-sync
+	// moves the same ALSA control the WebUI and Bluetooth use instead of applying
+	// a private software gain (which is what used to make source switches jump).
+	// Do not remove -- see customize04-volume.sh for the full invariant.
+	mixer_control_name = "Master";
 };
 
 diagnostics =
@@ -79,13 +92,19 @@ BEGIN {
     SUBSEP = "\034"
     depth = 0; sec = ""; pend = ""
 
-    nsec = 2; slist[1] = "general"; slist[2] = "diagnostics"
+    nsec = 3; slist[1] = "general"; slist[2] = "alsa"; slist[3] = "diagnostics"
 
-    nw["general"] = 2
+    nw["general"] = 3
     wkey["general", 1] = "interpolation"
     wval["general", 1] = "\tinterpolation = \"basic\"; // on a 650MHz A9 a soxr resample costs 22.35ms (30ms threshold); basic linear interpolation costs almost no CPU"
     wkey["general", 2] = "audio_backend_buffer_desired_length_in_seconds"
     wval["general", 2] = "\taudio_backend_buffer_desired_length_in_seconds = 1.0; // tolerates WiFi jitter; the 0.2s default underruns, the queue holds around 0.96s"
+    wkey["general", 3] = "volume_max_db"
+    wval["general", 3] = "\tvolume_max_db = 0.0; // one system volume: never use the +5 dB top end of the codec Master control (the DSP limiter sits before the codec, so it would clip)"
+
+    nw["alsa"] = 1
+    wkey["alsa", 1] = "mixer_control_name"
+    wval["alsa", 1] = "\tmixer_control_name = \"Master\"; // the single system volume knob: same ALSA control as the WebUI and Bluetooth (see customize04-volume.sh)"
 
     nw["diagnostics"] = 2
     wkey["diagnostics", 1] = "log_verbosity"
@@ -176,12 +195,19 @@ grep -qE '^[[:space:]]*statistics[[:space:]]*=[[:space:]]*"no"[[:space:]]*;' "$C
     || fail 'diagnostics.statistics is not "no"'
 grep -qE '^[[:space:]]*log_verbosity[[:space:]]*=[[:space:]]*3' "$CONF" \
     && fail 'debugging value log_verbosity = 3 is still present'
+# Unified volume: without these two the AirPlay volume is applied as a private
+# software gain and switching sources jumps in loudness (see customize04-volume.sh)
+grep -qE '^[[:space:]]*mixer_control_name[[:space:]]*=[[:space:]]*"Master"[[:space:]]*;' "$CONF" \
+    || fail 'alsa.mixer_control_name is not "Master" (AirPlay volume would use a private software gain)'
+grep -qE '^[[:space:]]*volume_max_db[[:space:]]*=[[:space:]]*0(\.0)?[[:space:]]*;' "$CONF" \
+    || fail 'general.volume_max_db is not 0.0 (the codec Master control reaches +5 dB, which would clip)'
 
 # The same key must not appear twice in a section (libconfig fails to parse and shairport-sync will not start)
-for k in interpolation audio_backend_buffer_desired_length_in_seconds log_verbosity statistics; do
+for k in interpolation audio_backend_buffer_desired_length_in_seconds log_verbosity statistics \
+         mixer_control_name volume_max_db; do
     n="$(grep -cE "^[[:space:]]*${k}[[:space:]]*=" "$CONF" || true)"
     [ "$n" -eq 1 ] || fail "key $k appears $n times (must be exactly 1; duplicate keys make shairport-sync refuse to start)"
 done
 
 echo "[hook] shairport-sync configuration applied"
-grep -nE '^[[:space:]]*(interpolation|audio_backend_buffer_desired_length_in_seconds|log_verbosity|statistics)[[:space:]]*=' "$CONF" | sed 's/^/  /'
+grep -nE '^[[:space:]]*(interpolation|audio_backend_buffer_desired_length_in_seconds|log_verbosity|statistics|mixer_control_name|volume_max_db)[[:space:]]*=' "$CONF" | sed 's/^/  /'

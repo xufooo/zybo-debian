@@ -239,15 +239,18 @@ user                "mpd"
 bind_to_address     "any"
 port                "6600"
 
-# Pure software mixing: does not rely on the codec's hardware mixer controls
-mixer_type          "software"
+# One system volume: the codec's ALSA "Master" control (see customize04-volume.sh).
+# mpd must NOT apply a volume of its own -- with mixer_type "software" it played at
+# its own level while AirPlay and the WebUI used another, so switching sources
+# jumped in loudness.
+mixer_type          "none"
 volume_normalization "no"
 
 audio_output {
     type        "alsa"
     name        "ZYBO (SSM2603 @48k)"
     device      "default"
-    mixer_type  "software"
+    mixer_type  "none"
 }
 EOF
 chroot "$TARGET" install -d -o mpd -g audio /var/lib/mpd/music /var/lib/mpd/playlists
