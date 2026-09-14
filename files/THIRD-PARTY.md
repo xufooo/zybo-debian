@@ -11,18 +11,18 @@
 |---|---|
 | Kernel / U-Boot / Go backend / Debian packages | ✅ obligations understood, compliant; the GPL-2.0 / LGPL-2.1 / MIT texts are shipped in the image (§2) |
 | Digilent's own VHDL (wrapper, DMA FIFO) | ✅ MIT, keep the notice |
-| **6 ADI-derived VHDL files** | ⚠️ **dual-licensed: GPL-2.0 or ADI-BSD (the latter is venue-restricted)**; the vendored copy is an older revision carrying only ADI-BSD -> see §4 |
+| **6 ADI-derived VHDL files** | ✅ **GPL-2.0** — selected from ADI's dual license; the ADI-BSD branch is venue-restricted and unusable here -> see §4 |
 | Our own code (hooks, scripts, Go backend, WebUI) | ✅ **GPL-2.0** (`LICENSE` at the repository root; see §6) |
 | FSBL inside `BOOT.BIN` (Xilinx MIT) + `md5.c` (Eric Young SSLeay) | ✅ texts added in `licenses/FSBL-MIT.txt` and `licenses/SSLeay-md5.txt` (§1a) |
 
 ---
 
-## 1. RTL distributed with the **bitstream** (boot partition `system.bit`)
+## 1. RTL distributed with the **bitstream** (inside the boot partition's `BOOT.BIN`)
 
 | File | Source | License | Obligation |
 |---|---|---|---|
 | `axi_i2s_adi_v1_2.vhd`, `axi_i2s_adi_S_AXI.vhd`, `dma_fifo.vhd`, `pl330_dma_fifo.vhd`, `axi_streaming_dma_tx/rx_fifo.vhd`, `component.xml`, `xgui/` | Digilent [vivado-library](https://github.com/Digilent/vivado-library) @ `f4613fff005b098065fd5d619a2b88e55720a423` | **MIT** (`License.txt`, Copyright (c) 2017 Digilent) | Keep the copyright + license notice (`licenses/Digilent-MIT.txt`) |
-| **`i2s_controller.vhd`, `i2s_tx.vhd`, `i2s_rx.vhd`, `i2s_clkgen.vhd`, `fifo_synchronizer.vhd`, `adi_common/axi_ctrlif.vhd`** | Same (copied by Digilent, code originally from ADI) | **ADI BSD + venue restriction** (file header: Copyright 2013 (c) Analog Devices, Inc.) | ⚠️ see §4 |
+| **`i2s_controller.vhd`, `i2s_tx.vhd`, `i2s_rx.vhd`, `i2s_clkgen.vhd`, `fifo_synchronizer.vhd`, `adi_common/axi_ctrlif.vhd`** | **ADI** [hdl](https://github.com/analogdevicesinc/hdl) @ `4840c81f2af172b036cb3ccb3f9f2dc45ed9c1d3` (branch `hdl_2026_r1`), taken verbatim | **GPL-2.0** (selected from the dual license — `licenses/ADI-hdl-LICENSE_GPL2.txt`) | Keep the copyright headers; the whole FPGA design is distributed under GPL-2.0 -> see §4 |
 | Rest of `hdl/adi_common/` | Same | No ADI copyright in the file header (treated as repository-level MIT) | Keep the notice |
 | Xilinx IP: PS7, AXI DMA, AXI IIC, and Vivado-generated netlists/primitives | Vivado 2024.1 | Xilinx EULA (proprietary) | The bitstream may only run on Xilinx devices; building requires a valid Vivado license |
 | Our own RTL (`dsp_insert.v`, `biquad_filter.v`, `limiter.v`, `saturator.v`, `volume_control.v`, `tb/*`) | This project | see §6 | — |
@@ -85,7 +85,7 @@ Every text is a verbatim copy; the provenance (component -> license -> source) i
 | `licenses/non-free-firmware-NOTICE.txt` | the non-free firmware blobs listed above | written for this release; the per-blob texts stay in `/usr/share/doc/firmware-*/copyright` |
 | `licenses/Go-BSD-3-Clause.txt`, `licenses/Go-PATENTS.txt` | Go runtime + standard library | the Go distribution |
 | `licenses/gorilla-websocket-BSD-3-Clause.txt` | `github.com/gorilla/websocket` v1.5.3 | upstream `LICENSE` |
-| `licenses/Digilent-MIT.txt`, `licenses/ADI-BSD-i2s-controller.txt`, `licenses/ZedEQ-MIT.txt` | RTL distributed in the bitstream (see §1) | see §1 |
+| `licenses/Digilent-MIT.txt`, `licenses/ADI-hdl-LICENSE_GPL2.txt` (selected), `licenses/ADI-hdl-LICENSE.txt`, `licenses/ADI-hdl-LICENSE_ADIBSD.txt` (not selected), `licenses/ADI-BSD-i2s-controller.txt` (historical header), `licenses/ZedEQ-MIT.txt` | RTL distributed in the bitstream (see §1, §4) | see §1 |
 
 Dependencies of the backend binary can be verified with Go's built-in metadata:
 
@@ -102,41 +102,39 @@ Vivado 2024.1 (Xilinx, proprietary), the Go toolchain, Python 3,
 
 None of these ship in the release, so they create no distribution obligation.
 
-## 4. ⚠️ Key risk: ADI-derived HDL (**dual-licensed**, checked against the original)
+## 4. ADI-derived HDL: the GPL-2.0 branch is used (decided 2026-09-14)
 
 The six files `i2s_controller.vhd`, `i2s_tx.vhd`, `i2s_rx.vhd`, `i2s_clkgen.vhd`,
-`fifo_synchronizer.vhd` and `adi_common/axi_ctrlif.vhd` originate from ADI.
-**ADI now dual-licenses them** (the repository root carries both `LICENSE_GPL2` and
-`LICENSE_ADIBSD`):
+`fifo_synchronizer.vhd` and `adi_common/axi_ctrlif.vhd` originate from ADI, which
+dual-licenses them:
 
-```
--- Redistribution and use of source or resulting binaries ... are permitted under
--- one of the following two license terms:
---   1. The GNU General Public License version 2 ...        <- no venue restriction
---   OR
---   2. An ADI specific BSD license ... as long as it attaches to an ADI device.
-```
+1. the **GNU General Public License version 2**, or
+2. an **ADI-specific BSD license**, limited to software that runs on, or is directly
+   connected to, an Analog Devices component.
 
-- The **ADI-BSD branch** requires the code to run on an ADI device. This board is a
-  Xilinx Zynq with a **TI** SSM2603, so that condition is not met and this branch
-  **cannot be used**.
-- The **GPL-2.0 branch** has no venue restriction, but requires providing the
-  **corresponding source for the whole design** under GPL-2.0.
-- **⚠️ The vendored copy is an early Digilent snapshot** (`f4613ff`) whose file
-  headers carry **only ADI-BSD**, with no GPL option -> as built today, the
-  bitstream satisfies neither branch.
+This board is a Xilinx Zynq with a **TI** SSM2603 codec, so branch 2 does not apply.
+**This project uses branch 1 (GPL-2.0)** and takes the six files verbatim from
+[`analogdevicesinc/hdl`](https://github.com/analogdevicesinc/hdl) at commit
+`4840c81f2af172b036cb3ccb3f9f2dc45ed9c1d3` (branch `hdl_2026_r1`); the license
+texts as published there are reproduced in the FPGA source tree, and the GPL-2.0
+text is also shipped in the image as `licenses/ADI-hdl-LICENSE_GPL2.txt`.
 
-Differences verified (case-insensitive): `i2s_tx`/`i2s_rx`/`i2s_clkgen` are
-**identical** to the current ADI version; `axi_ctrlif` differs by 4 lines;
-`i2s_controller` by 59 lines; `fifo_synchronizer` by 51 lines (the newer ADI version
-splits the single `resetn` into `in_resetn`/`out_resetn`, a more robust CDC design).
-The ports of `i2s_controller` match the ADI version, and `fifo_synchronizer` is only
-instantiated by it, so the two can be swapped together.
+What that means: everything that goes into the bitstream — the six ADI files, the
+Digilent wrapper/DMA VHDL (MIT), this project's own RTL and the build scripts — is
+distributed under **GPL-2.0**, so the FPGA design is open source. The RTL and build
+scripts themselves are not published in this repository (see the last section of
+this document); they are reproducible from the two pinned upstream commits plus
+this project's sources.
 
-**Two options**: **(G)** switch to the current ADI version (dual-licensed) and
-distribute the whole design under GPL-2.0 (cost: our FPGA RTL must be open-sourced);
-**(R)** rewrite the I2S core (cost: a few days of RTL work, but the RTL can stay
-closed). The choice is still open.
+Earlier revisions of this document described an older Digilent snapshot whose file
+headers carried only the ADI-BSD branch, which made neither branch usable. That copy
+has been replaced; the historical header is kept in
+`licenses/ADI-BSD-i2s-controller.txt` for reference only.
+
+One question remains open, and it is **not** about ADI: the bitstream also contains
+Xilinx proprietary IP, so whether a *published* bitstream can satisfy GPL-2.0
+section 3 ("complete corresponding source") is unsettled. That is why no bitstream,
+`BOOT.BIN` or image is published (see the last section).
 
 ## 5. Version number and artifacts
 
@@ -165,6 +163,9 @@ GPL-2.0 source for the `zybo-audio-web` binary shipped in the image is available
 alongside it; the binary itself is built from those sources by the CI workflow and
 is not tracked in git.
 
-The PL bitstream / `BOOT.BIN` / images are **not** published at this time: the
-ADI-derived HDL license question (§4) is unresolved, so no bitstream or image is
-stored in the repository or attached to a release.
+The PL bitstream / `BOOT.BIN` / images are **not** published at this time. The
+ADI-derived HDL question is settled in favour of GPL-2.0 (§4), but the bitstream
+also contains Xilinx proprietary IP, and whether a published bitstream can meet
+GPL-2.0 section 3 is unresolved; until it is, no bitstream or image is stored in the
+repository or attached to a release. The GPL-2.0 sources for everything this
+repository does ship (hooks, scripts, Go backend, WebUI) are in the repository.
