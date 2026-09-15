@@ -290,7 +290,12 @@ func handleVolume(w http.ResponseWriter, r *http.Request) {
 	// mapping (silence) and raw 127 is +5 dB of gain, so a raw percentage is
 	// silent at the bottom and clips at the top (see volume.go).
 	if err := setSystemVolume(body.Volume); err != nil {
+		// A failed write must be reported: this used to log and still answer 200,
+		// so external scripts believed the volume had been set. Do not seed the
+		// cache either -- a value that was never written is not the current value.
 		log.Printf("volume: %v", err)
+		http.Error(w, "mixer write failed: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 	currentVolume = body.Volume
 	noteSystemVolume(body.Volume)
