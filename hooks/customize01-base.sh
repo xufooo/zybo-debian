@@ -169,15 +169,18 @@ EOF
 # Rate converter: without libasound2-plugins the only converter available is alsa-lib's
 # built-in "linear" interpolation, which costs about 41 dB of SNR on 44.1 kHz material
 # (measured against a high-precision soxr reference). libasound2-plugins provides
-# ffmpeg's polyphase resampler, measured at ~86 dB SNR for ~6% CPU on this 650 MHz
+# ffmpeg's polyphase resampler, which measures ~86 dB SNR for ~6% CPU on this 650 MHz
 # Cortex-A9, so every 44.1 kHz source (AirPlay, Bluetooth, mpd) gets a transparent
 # conversion instead of a 7-bit one.
+# "lavrate_higher" is the 64-tap setting of that converter ("lavrate_high" is 32 taps,
+# "lavrate" 16); the two measure the SAME cost on the board (6.1% vs 5.9%), so the
+# longer filter is taken for free.
 # The alternatives were measured and rejected: samplerate_best and speexrate_best
 # cannot keep up in real time (3.0x / 1.4x the audio duration, i.e. they underrun),
 # samplerate_medium costs ~42% CPU, and samplerate_linear is no better than the
 # built-in linear converter.
 cat > "$TARGET/etc/asound.conf" <<'EOF'
-defaults.pcm.rate_converter "lavrate_high"
+defaults.pcm.rate_converter "lavrate_higher"
 
 pcm.!default {
     type plug
