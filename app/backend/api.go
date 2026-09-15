@@ -293,14 +293,12 @@ func handleVolume(w http.ResponseWriter, r *http.Request) {
 		body.Volume = 100
 	}
 
-	// ALSA volume: amixer sset Master <vol>% — the single system volume knob
-	// (see volume.go; shairport-sync and bluealsa-aplay write the same control)
-	volPercent := strconv.Itoa(body.Volume) + "%"
-	exec.Command("amixer", "sset", "Master", volPercent).Run()
-
-	// FPGA master volume (0.0 ~ 1.0)
-	if err := dspSetMasterVolume(float64(body.Volume) / 100.0); err != nil {
-		log.Printf("DSP volume: %v", err)
+	// ALSA volume: the single system knob, calibrated in dB (0% = mute,
+	// 100% = 0 dB). Do NOT write "<n>%": on this codec raw 0..47 has no dB
+	// mapping (silence) and raw 127 is +5 dB of gain, so a raw percentage is
+	// silent at the bottom and clips at the top (see volume.go).
+	if err := setSystemVolume(body.Volume); err != nil {
+		log.Printf("volume: %v", err)
 	}
 	currentVolume = body.Volume
 	noteSystemVolume(body.Volume)

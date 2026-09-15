@@ -43,6 +43,7 @@ assert_release() { # assert_release <case name> <file>
     has "$1: statistics=no"            "$2" '^[[:space:]]*statistics[[:space:]]*=[[:space:]]*"no"[[:space:]]*;'
     has "$1: mixer_control_name=Master" "$2" '^[[:space:]]*mixer_control_name[[:space:]]*=[[:space:]]*"Master"[[:space:]]*;'
     has "$1: volume_max_db=0.0"        "$2" '^[[:space:]]*volume_max_db[[:space:]]*=[[:space:]]*0(\.0)?[[:space:]]*;'
+    has "$1: volume_range_db=60"       "$2" '^[[:space:]]*volume_range_db[[:space:]]*=[[:space:]]*60[[:space:]]*;'
     nhas "$1: no verbosity=3"          "$2" '^[[:space:]]*log_verbosity[[:space:]]*=[[:space:]]*3'
     nhas "$1: no statistics=yes"       "$2" '^[[:space:]]*statistics[[:space:]]*=[[:space:]]*"yes"'
     nhas "$1: no log_output_to=stderr" "$2" '^[[:space:]]*log_output_to[[:space:]]*=[[:space:]]*"stderr"'
@@ -52,6 +53,7 @@ assert_release() { # assert_release <case name> <file>
     cnt  "$1: statistics unique"      "$2" 'statistics' 1
     cnt  "$1: mixer_control_name unique" "$2" 'mixer_control_name' 1
     cnt  "$1: volume_max_db unique"   "$2" 'volume_max_db' 1
+    cnt  "$1: volume_range_db unique" "$2" 'volume_range_db' 1
 }
 
 # --- Case A: config file missing -> create -----------------------------------
