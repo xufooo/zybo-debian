@@ -96,6 +96,14 @@
   /* status bar */
   .status-bar{display:flex;justify-content:center;gap:16px;
                font-size:10px;color:#8f95a8;padding:4px 0}
+  /* Reboot: kept at the very bottom and visually subdued, since rebooting during
+     playback cuts the audio */
+  .sys-row{display:flex;align-items:center;justify-content:center;gap:10px;
+             font-size:10px;color:#8f95a8;padding:6px 0 0}
+  .sys-btn{padding:5px 12px;border-radius:7px;background:transparent;
+             border:1px solid #3a3a55;color:#8f95a8;font-size:11px;cursor:pointer}
+  .sys-btn:hover{border-color:#c4646e;color:#c4646e}
+  .sys-btn:disabled{opacity:.5;cursor:default}
 </style>
 </head>
 <body>
@@ -155,6 +163,12 @@
     <span>CPU <span id="sys-cpu">--</span>%</span>
     <span>RAM <span id="sys-ram">--</span>MB</span>
     <span>Uptime <span id="sys-uptime">--</span></span>
+  </div>
+
+  <!-- System actions ──────────────────────────────────── -->
+  <div class="sys-row">
+    <button class="sys-btn" id="btn-reboot">Reboot</button>
+    <span id="sys-note"></span>
   </div>
 
 </div>
@@ -425,6 +439,36 @@ $('file-import').addEventListener('change', function(){
     .then(r => r.json())
     .then(d => { alert('Imported: '+d.preset+' ('+d.bands+' bands)'); fetchStatus(); })
     .catch(e => alert('Import failed: '+e));
+});
+
+// ── Reboot ─────────────────────────────────────────────────────────────
+// The backend's POST /api/reboot just runs `reboot` and returns, with no progress
+// to report, so the page probes for liveness itself and reloads once the backend
+// answers again (about 20-30 s) instead of making the user refresh by hand.
+$('btn-reboot').addEventListener('click', function(){
+  if(!confirm('Reboot ZYBO Audio?\n\nPlayback stops immediately and this page reloads itself in about 30 seconds.')) return;
+  const btn = this;
+  btn.disabled = true;
+  btn.textContent = 'Rebooting...';
+  setText('sys-note', 'The device is rebooting; this page will reload by itself.');
+  fetch(API+'/api/reboot', { method:'POST' }).catch(function(){});
+  let tries = 0;
+  const timer = setInterval(function(){
+    tries++;
+    fetch(API+'/api/status').then(function(r){
+      if(r.ok){                       // the backend is back (a fresh instance)
+        clearInterval(timer);
+        setText('sys-note', 'Back up, reloading...');
+        location.reload();
+      }
+    }).catch(function(){});           // unreachable while rebooting: expected
+    if(tries >= 45){                  // stop waiting after ~90 s
+      clearInterval(timer);
+      setText('sys-note', 'Still down; refresh the page or check the power');
+      btn.disabled = false;
+      btn.textContent = 'Reboot';
+    }
+  }, 2000);
 });
 
 fetchStatus();
