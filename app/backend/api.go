@@ -24,14 +24,14 @@ type BandStatus struct {
 }
 
 type DSPStatus struct {
-	Available   bool         `json:"available"`
-	Enabled     bool         `json:"enabled"`
-	Bypass      bool         `json:"bypass"`
-	Preset      string       `json:"preset"`
+	Available bool   `json:"available"`
+	Enabled   bool   `json:"enabled"`
+	Bypass    bool   `json:"bypass"`
+	Preset    string `json:"preset"`
 	// PreampDB is the headroom compensation actually folded into the coefficients
 	// (dB, <=0): when the EQ boosts, this much is taken off so the cascade stays
 	// within 0 dBFS (see headroom.go). 0 means no compensation was needed.
-	PreampDB float64 `json:"preamp_db"`
+	PreampDB    float64      `json:"preamp_db"`
 	BandsActive int          `json:"bands_active"`
 	Limiter     bool         `json:"limiter"`
 	LimThrDB    float64      `json:"lim_thr_db"`
@@ -48,15 +48,20 @@ type SystemStatus struct {
 }
 
 type APIStatus struct {
-	Version string       `json:"version"`
-	Source  string       `json:"source"`
-	Title   string       `json:"title"`
-	Artist  string       `json:"artist"`
-	Album   string       `json:"album"`
-	Playing bool         `json:"playing"`
-	Volume  int          `json:"volume"`
-	DSP     DSPStatus    `json:"dsp"`
-	System  SystemStatus `json:"system"`
+	Version string `json:"version"`
+	Source  string `json:"source"`
+	Title   string `json:"title"`
+	Artist  string `json:"artist"`
+	Album   string `json:"album"`
+	Playing bool   `json:"playing"`
+	Volume  int    `json:"volume"`
+	// VolumeDB is the dB reading of Volume. The slider scale is calibrated in dB
+	// and is NOT the percentage amixer reports for the raw register (60 dB across
+	// 100 positions = 1.667%/step, while raw steps by 1 dB), so the UI has to show
+	// the dB value to agree with amixer.
+	VolumeDB float64      `json:"volume_db"`
+	DSP      DSPStatus    `json:"dsp"`
+	System   SystemStatus `json:"system"`
 	// Sources reports whether each source is available (installed in this image); the UI greys out buttons based on it
 	Sources map[string]bool `json:"sources"`
 }
@@ -80,20 +85,7 @@ var (
 func handleStatus(w http.ResponseWriter, r *http.Request) {
 	collectMetadata()
 
-	status := APIStatus{
-		Version: appVersion,
-		Source:  currentSource,
-		Title:   currentTitle,
-		Artist:  currentArtist,
-		Album:   currentAlbum,
-		Playing: currentPlaying,
-		// Read the mixer back: shairport-sync (AirPlay) and bluealsa-aplay
-		// (Bluetooth) move the same control, so the UI must follow them.
-		Volume:  readSystemVolume(currentVolume),
-		DSP:     dspStatusSnapshot(),
-		System:  getSystemStatus(),
-		Sources: sourceStates(),
-	}
+	status := buildStatus()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(status)

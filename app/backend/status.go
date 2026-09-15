@@ -72,6 +72,32 @@ func getMemUsedMB() int {
 
 // ── Status push ───────────────────────────────────────────────────────
 
+// buildStatus is the ONE place that assembles APIStatus: both the HTTP
+// /api/status handler and the WebSocket pusher call it.
+//
+// Why it exists (2026-09-15): the two used to build their own APIStatus, and
+// adding volume_db only to the HTTP copy left the WebSocket pushing volume_db=0
+// once a second, which overwrote the UI value -- correct on page load, wrong a
+// second later. Status fields may only be assembled in this function.
+func buildStatus() APIStatus {
+	return APIStatus{
+		Version: appVersion,
+		Source:  currentSource,
+		Title:   currentTitle,
+		Artist:  currentArtist,
+		Album:   currentAlbum,
+		Playing: currentPlaying,
+		// Read the mixer back: the WebUI/REST writes it and bluealsa-aplay
+		// (Bluetooth) moves it (AirPlay no longer touches it since
+		// ignore_volume_control=yes), so the UI must follow it.
+		Volume:   readSystemVolume(currentVolume),
+		VolumeDB: systemVolumeDB(currentVolume),
+		DSP:      dspStatusSnapshot(),
+		System:   getSystemStatus(),
+		Sources:  sourceStates(),
+	}
+}
+
 func statusPusher(hub *wsHub, sm *sourceManager) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
@@ -82,20 +108,7 @@ func statusPusher(hub *wsHub, sm *sourceManager) {
 		// Collect metadata
 		collectMetadata()
 
-		status := APIStatus{
-			Version: appVersion,
-			Source:  currentSource,
-			Title:   currentTitle,
-			Artist:  currentArtist,
-			Album:   currentAlbum,
-			Playing: currentPlaying,
-			// Read the mixer back: shairport-sync (AirPlay) and bluealsa-aplay
-			// (Bluetooth) move the same control, so the UI must follow them.
-			Volume:  readSystemVolume(currentVolume),
-			DSP:     dspStatusSnapshot(),
-			System:  getSystemStatus(),
-			Sources: sourceStates(),
-		}
+		status := buildStatus()
 
 		// Push only when the state changes (simple checksum)
 		jsonBytes, _ := json.Marshal(status)

@@ -34,10 +34,21 @@
 //
 // Cost: one `amixer` run takes about 23 ms on this 650 MHz Cortex-A9, so the
 // value is cached briefly.
+//
+// SECOND PITFALL: the mixer only has a 1 dB grid (raw steps by exactly 1 dB),
+// while squeezing 60 dB into 100 positions means 1.667% per step. Several slider
+// positions therefore cannot be represented, which is where "I set 50 and it
+// reads back 52" came from (measured on hardware, 2026-09-15). The rules here:
+//   - write: pctToDB, then ROUND to whole dB (Go's int() truncates toward zero,
+//     so int(x+0.5) turns -29.5 into -29 -- that was the missing 1 dB), then raw
+//   - read: derive pct from raw, and after writing the control seed the cache
+//     with the value from that same grid (quantizePct), so what the UI shows and
+//     what a later read returns can never disagree.
 
 package main
 
 import (
+	"math"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -66,6 +77,7 @@ const (
 var (
 	volumeMu     sync.Mutex
 	volumePct    = -1
+	volumeDB     float64
 	volumeReadAt time.Time
 )
 
@@ -94,6 +106,30 @@ func dbToPct(db float64) int {
 		return 100
 	}
 	return int((db-volumeMinDB)/(volumeMaxDB-volumeMinDB)*100.0 + 0.5)
+}
+
+// mixerRawForPct returns the raw value to write for a slider position
+// (0 means mute). The rounding must use math.Round: on negative numbers
+// int(x+0.5) truncates toward zero and lands one dB high.
+func mixerRawForPct(pct int) int {
+	if pct <= 0 {
+		return 0
+	}
+	raw := mixerZeroDBRaw + int(math.Round(pctToDB(pct)))
+	if raw > 127 {
+		raw = 127
+	}
+	if raw < 1 {
+		raw = 1
+	}
+	return raw
+}
+
+// quantizePct maps a requested slider position onto the percentage the mixer
+// grid can actually reach. On 1 dB hardware the two can differ by one step;
+// using this keeps "what we write" and "what a read returns" the same value.
+func quantizePct(pct int) int {
+	return dbToPct(float64(mixerRawForPct(pct) - mixerZeroDBRaw))
 }
 
 // parseMixerDB pulls the dB value out of `amixer sget` output, e.g.
@@ -134,8 +170,17 @@ func readSystemVolume(fallback int) int {
 		return fallback
 	}
 	pct := dbToPct(db)
-	volumePct, volumeReadAt = pct, time.Now()
+	volumePct, volumeDB, volumeReadAt = pct, db, time.Now()
 	return pct
+}
+
+// systemVolumeDB returns the dB reading from the same cache readSystemVolume
+// uses, so the UI can show the dB value and agree with `amixer`.
+func systemVolumeDB(fallback int) float64 {
+	readSystemVolume(fallback) // keeps the cache fresh (a hit does not run amixer)
+	volumeMu.Lock()
+	defer volumeMu.Unlock()
+	return volumeDB
 }
 
 // setSystemVolume writes the mixer using the dB calibration; 0% is real mute.
@@ -143,20 +188,22 @@ func setSystemVolume(pct int) error {
 	if pct <= 0 {
 		return exec.Command("amixer", "-c", "0", "sset", mixerControl, "0").Run()
 	}
-	raw := mixerZeroDBRaw + int(pctToDB(pct)+0.5)
-	if raw > 127 {
-		raw = 127
-	}
-	if raw < 1 {
-		raw = 1
-	}
-	return exec.Command("amixer", "-c", "0", "sset", mixerControl, strconv.Itoa(raw)).Run()
+	return exec.Command("amixer", "-c", "0", "sset", mixerControl,
+		strconv.Itoa(mixerRawForPct(pct))).Run()
 }
 
 // noteSystemVolume seeds the cache after we wrote the control ourselves, so the
-// UI reflects the change immediately instead of waiting for the next read.
+// UI reflects the change immediately instead of waiting for the next read. It
+// seeds the value quantized onto the grid, so the UI does not show 50 and then
+// jump to 52.
 func noteSystemVolume(pct int) {
 	volumeMu.Lock()
-	volumePct, volumeReadAt = pct, time.Now()
+	if pct <= 0 {
+		volumePct, volumeDB = 0, volumeMinDB
+	} else {
+		volumePct = quantizePct(pct)
+		volumeDB = float64(mixerRawForPct(pct) - mixerZeroDBRaw)
+	}
+	volumeReadAt = time.Now()
 	volumeMu.Unlock()
 }
