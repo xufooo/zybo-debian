@@ -1,28 +1,43 @@
 #!/bin/sh
 # ============================================================================
-# customize04-volume.sh — separate volumes: the sender keeps its own, the board
-#                         keeps exactly one
+# customize04-volume.sh — the board keeps exactly one volume, and no sender can
+#                         move it
 # ============================================================================
 # The rule this hook enforces:
 #
 #   * the BOARD has exactly one volume, the codec's ALSA "Master" control, and
 #     the WebUI/REST API is the only writer of it. It therefore sounds the same
 #     whichever source is selected.
-#   * every SOURCE keeps its own volume, applied in software *inside that
-#     source*: the phone's AirPlay slider (shairport-sync's software mixer) and
-#     the phone's AVRCP slider over Bluetooth (bluealsa-aplay --volume=software).
-#     Those adjust that one stream only and never move the board's volume.
+#   * a SOURCE either keeps its own volume or ignores the sender's entirely:
+#       - AirPlay: the phone's slider is IGNORED (ignore_volume_control = "yes").
+#         Applying it in software lands on shairport-sync's own 0..-96.1 dB
+#         scale, so a phone at about -20 dB ends up ~64 dB below every other
+#         source -- which is heard as "huge noise floor, faint vocal".
+#       - Bluetooth: bluealsa-aplay --volume=software puts the BlueALSA PCM into
+#         soft-volume mode. Per bluealsa(8), soft-volume "does not interact with
+#         the Bluetooth AVRCP volume property": it scales samples by bluealsa's
+#         OWN volume, which defaults to 100% (full scale) on first connect and is
+#         then remembered per device in /var/lib/bluealsa/. So the phone's slider
+#         does not change the loudness and the stream reaches the board at unity,
+#         the same way AirPlay does. It is --volume=mixer (or =auto with a PCM in
+#         native mode) that hands AVRCP to an ALSA mixer -- i.e. to the board's
+#         Master control -- and that is exactly what this hook prevents.
+#         (An earlier version of this note claimed the AVRCP slider was applied
+#         in software; that was a wrong reading of bluealsa's volume modes.)
+#     Either way a source never writes the board's volume.
 #
 # Why not let the sources drive the codec mixer (the obvious "one knob" design)?
 # It was tried and reverted: with alsa.mixer_control_name = "Master", the phone
 # overwrote the board volume (the slider looked stuck) and shairport-sync
 # re-wrote the control on every DACP poll, which is audible as pops (measured:
-# 346 mixer operations in 20 minutes). Keeping the sender's volume in software
-# also puts that attenuation *before* the DSP, which leaves the EQ its headroom.
+# 346 mixer operations in 20 minutes). With the sender's volume ignored instead,
+# the stream arrives at full scale, so the board volume alone sets the loudness
+# and switching sources cannot change it -- and the EQ keeps its headroom.
 #
 # How this is wired:
-#   - customize03-shairport.sh: no mixer_control_name (software volume), plus
-#     volume_max_db = 0.0 and volume_range_db = 60 for the software mixer
+#   - customize03-shairport.sh: ignore_volume_control = "yes" (the sender's
+#     slider is dropped; volume_max_db = 0.0 and volume_range_db = 60 are kept
+#     as a bound on the software mixer that would apply it)
 #   - customize01-base.sh: mpd.conf with mixer_type "none" (mpd adds no volume)
 #   - this hook: bluealsa-aplay --volume=software, and the assertions below
 #   - the backend writes/reads the codec control for the WebUI, calibrated in dB
@@ -39,9 +54,11 @@ TARGET="${1:?usage: customize04-volume.sh <rootfs dir>}"
 DROPIN="$TARGET/etc/systemd/system/bluealsa-aplay.service.d"
 mkdir -p "$DROPIN"
 cat > "$DROPIN/10-volume.conf" <<'EOF'
-# Separate volumes: the phone's AVRCP volume is applied in software to the
-# Bluetooth stream only; the board's own volume is the codec's ALSA Master,
-# written by the WebUI. The two never fight. See hooks/customize04-volume.sh.
+# Separate volumes: force the BlueALSA PCM into soft-volume mode, so AVRCP (the
+# phone's volume slider) is not linked to any ALSA mixer. The stream reaches the
+# board's own volume (codec ALSA Master, written by the WebUI) at unity gain --
+# the same treatment AirPlay gets via ignore_volume_control. See
+# hooks/customize04-volume.sh for the full reasoning.
 [Service]
 ExecStart=
 ExecStart=/usr/bin/bluealsa-aplay -S --volume=software
@@ -70,7 +87,7 @@ bad="$(grep -cE '^[[:space:]]*mixer_type[[:space:]]+"software"' "$MPD" || true)"
 [ "$bad" -eq 0 ] || fail "mpd.conf still has mixer_type \"software\" ($bad occurrence(s)); mpd would keep its own volume"
 
 grep -q -- '--volume=software' "$DROPIN/10-volume.conf" \
-    || fail 'bluealsa-aplay does not use --volume=software (the phone would drive the board volume)'
+    || fail 'bluealsa-aplay does not use --volume=software: with --volume=mixer (or =auto on a native-mode PCM) bluealsa-aplay would operate the ALSA Master control, so the phone would drive the board volume'
 
 echo "[hook] volumes are separate: board = ALSA Master (WebUI only), sources = their own"
 echo "  shairport-sync : software volume (mixer_control_name absent)"
