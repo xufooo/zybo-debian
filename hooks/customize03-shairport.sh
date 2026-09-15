@@ -73,15 +73,6 @@ general =
 	volume_range_db = 60;
 };
 
-alsa =
-{
-	// The single system volume knob: with mixer_control_name set, shairport-sync
-	// moves the same ALSA control the WebUI and Bluetooth use instead of applying
-	// a private software gain (which is what used to make source switches jump).
-	// Do not remove -- see customize04-volume.sh for the full invariant.
-	mixer_control_name = "Master";
-};
-
 diagnostics =
 {
 	// Release configuration: all diagnostics off (only enabled while debugging)
@@ -97,7 +88,7 @@ BEGIN {
     SUBSEP = "\034"
     depth = 0; sec = ""; pend = ""
 
-    nsec = 3; slist[1] = "general"; slist[2] = "alsa"; slist[3] = "diagnostics"
+    nsec = 2; slist[1] = "general"; slist[2] = "diagnostics"
 
     nw["general"] = 4
     wkey["general", 1] = "interpolation"
@@ -109,9 +100,6 @@ BEGIN {
     wkey["general", 4] = "volume_range_db"
     wval["general", 4] = "\tvolume_range_db = 60; // pin the range: the native dB range of the mixer is unusable (ALSA cannot map raw 0..47, so a session volume could land in silence)"
 
-    nw["alsa"] = 1
-    wkey["alsa", 1] = "mixer_control_name"
-    wval["alsa", 1] = "\tmixer_control_name = \"Master\"; // the single system volume knob: same ALSA control as the WebUI and Bluetooth (see customize04-volume.sh)"
 
     nw["diagnostics"] = 2
     wkey["diagnostics", 1] = "log_verbosity"
@@ -189,6 +177,14 @@ END {
     mv -f "$CONF.zybo-new" "$CONF"
 fi
 
+# --- Volumes stay separate: the sender keeps its own, the board keeps its own ---
+# shairport-sync must NOT drive the codec's mixer. With mixer_control_name set, the
+# phone's AirPlay volume overwrites the board's volume (the WebUI slider appears
+# stuck) and every DACP poll re-writes the control, which is audible as pops. The
+# sender's volume is applied in software instead, upstream of the DSP, and the
+# board's own volume lives in the codec mixer written only by the WebUI.
+sed -i 's|^[[:space:]]*mixer_control_name[[:space:]]*=.*|// mixer_control_name removed by customize03: the board keeps its own volume (see customize04-volume.sh)|' "$CONF"
+
 # --- Verify: all four keys are in place and no diagnostic key holds a debugging value ---
 fail() { echo "[hook] ERROR: shairport-sync config validation failed: $1" >&2; exit 1; }
 
@@ -202,10 +198,9 @@ grep -qE '^[[:space:]]*statistics[[:space:]]*=[[:space:]]*"no"[[:space:]]*;' "$C
     || fail 'diagnostics.statistics is not "no"'
 grep -qE '^[[:space:]]*log_verbosity[[:space:]]*=[[:space:]]*3' "$CONF" \
     && fail 'debugging value log_verbosity = 3 is still present'
-# Unified volume: without these two the AirPlay volume is applied as a private
-# software gain and switching sources jumps in loudness (see customize04-volume.sh)
-grep -qE '^[[:space:]]*mixer_control_name[[:space:]]*=[[:space:]]*"Master"[[:space:]]*;' "$CONF" \
-    || fail 'alsa.mixer_control_name is not "Master" (AirPlay volume would use a private software gain)'
+# Separate volumes: shairport must NOT own the codec mixer (see the sed above)
+grep -qE '^[[:space:]]*mixer_control_name[[:space:]]*=' "$CONF" \
+    && fail 'mixer_control_name is set: the sender would overwrite the board volume and re-write it on every poll'
 grep -qE '^[[:space:]]*volume_max_db[[:space:]]*=[[:space:]]*0(\.0)?[[:space:]]*;' "$CONF" \
     || fail 'general.volume_max_db is not 0.0 (the codec Master control reaches +5 dB, which would clip)'
 grep -qE '^[[:space:]]*volume_range_db[[:space:]]*=[[:space:]]*60[[:space:]]*;' "$CONF" \
@@ -213,10 +208,12 @@ grep -qE '^[[:space:]]*volume_range_db[[:space:]]*=[[:space:]]*60[[:space:]]*;' 
 
 # The same key must not appear twice in a section (libconfig fails to parse and shairport-sync will not start)
 for k in interpolation audio_backend_buffer_desired_length_in_seconds log_verbosity statistics \
-         mixer_control_name volume_max_db volume_range_db; do
+         volume_max_db volume_range_db; do
     n="$(grep -cE "^[[:space:]]*${k}[[:space:]]*=" "$CONF" || true)"
     [ "$n" -eq 1 ] || fail "key $k appears $n times (must be exactly 1; duplicate keys make shairport-sync refuse to start)"
 done
 
 echo "[hook] shairport-sync configuration applied"
-grep -nE '^[[:space:]]*(interpolation|audio_backend_buffer_desired_length_in_seconds|log_verbosity|statistics|mixer_control_name|volume_max_db|volume_range_db)[[:space:]]*=' "$CONF" | sed 's/^/  /'
+grep -nE '^[[:space:]]*(interpolation|audio_backend_buffer_desired_length_in_seconds|log_verbosity|statistics|volume_max_db|volume_range_db)[[:space:]]*=' "$CONF" | sed 's/^/  /'
+n_mixer="$(grep -cE '^[[:space:]]*mixer_control_name[[:space:]]*=' "$CONF" || true)"
+echo "[hook] shairport-sync does not own the codec mixer (active mixer_control_name lines: $n_mixer)"
