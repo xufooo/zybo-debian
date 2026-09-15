@@ -69,15 +69,17 @@ type APIStatus struct {
 // ── Global mutable state (simple, single-writer from API goroutine) ────
 
 var (
-	currentSource  = "idle"
-	currentTitle   = ""
-	currentArtist  = ""
-	currentAlbum   = ""
-	currentPlaying = false
-	currentVolume  = 80
-	currentPreset  = "flat"
-	dspEnabled     = true
-	dspBypass      = false
+	currentSource = "idle"
+	currentTitle  = ""
+	currentArtist = ""
+	currentAlbum  = ""
+	// There used to be a currentPlaying flag here. It was removed: it was never
+	// accurate and never went back to false. "Is it playing" now comes from the
+	// sound card itself -- see systemIsPlaying() in status.go.
+	currentVolume = 80
+	currentPreset = "flat"
+	dspEnabled    = true
+	dspBypass     = false
 )
 
 // ── Handlers ──────────────────────────────────────────────────────────
@@ -337,10 +339,7 @@ func handleSourceSelect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	currentSource = body.Source
-	currentTitle = ""
-	currentArtist = ""
-	currentAlbum = ""
-	currentPlaying = (body.Source != "idle")
+	clearMetadata() // switching sources must drop the previous track's info
 
 	log.Printf("Source switched: %s", body.Source)
 	w.WriteHeader(http.StatusOK)
@@ -448,36 +447,58 @@ func handleEQExport(w http.ResponseWriter, r *http.Request) {
 }
 
 // ── Metadata ────────────────────────────────────────────────────────
+//
+// CURRENT STATE (measured on hardware, 2026-09-15): AirPlay shows no track info,
+// because shairport-sync metadata is disabled in the shipped configuration (the
+// whole `metadata = { ... }` block is commented out) and this file never exists.
+// The path below is the older file-based implementation; it is kept honest
+// rather than pretending to work.
+//
+// Two traps for whoever wires this up:
+//  1. shairport's pipe name defaults to /tmp/shairport-sync-metadata (not the
+//     path below) and requires metadata = { enabled = "yes"; pipe_name = "..."; }
+//  2. that pipe is a FIFO, not a regular file: os.ReadFile blocks on open until
+//     a writer appears, which would stall the once-a-second status pusher.
+//     Read it from a long-lived goroutine instead, parsing <item> blocks
+//     (<type>core</type>, <code>minm|asar|asal</code>, <data>...</data>).
+var metadataPath = "/tmp/shairport-metadata"
 
 func collectMetadata() {
-	// Simple implementation: read the metadata file produced by the source
-	// shairport-sync writes to /tmp/shairport-metadata
-	// gmrender has no standard metadata, so leave it empty
 	switch currentSource {
 	case "airplay":
-		data, err := osReadFile("/tmp/shairport-metadata")
-		if err == nil {
-			// Simple parsing: title=... artist=...
-			parseMetadata(string(data))
+		data, err := osReadFile(metadataPath)
+		if err != nil {
+			// No file (the case in this image): the previous track's info has to
+			// be cleared, otherwise the panel stays stuck on the old title.
+			clearMetadata()
+			return
 		}
+		parseMetadata(string(data))
 	case "dlna":
-		// gmrender metadata TBD
+		// gmrender has no standard metadata
+		clearMetadata()
 	}
 }
 
+func clearMetadata() {
+	currentTitle, currentArtist, currentAlbum = "", "", ""
+}
+
+// parseMetadata parses "title=... / artist=... / album=..." text.
+// It accumulates into locals and assigns at the end, so fields missing from the
+// file are cleared rather than left over from the previous track.
 func parseMetadata(raw string) {
+	title, artist, album := "", "", ""
 	for _, line := range strings.Split(raw, "\n") {
 		if strings.HasPrefix(line, "title=") {
-			currentTitle = strings.TrimPrefix(line, "title=")
+			title = strings.TrimPrefix(line, "title=")
 		}
 		if strings.HasPrefix(line, "artist=") {
-			currentArtist = strings.TrimPrefix(line, "artist=")
+			artist = strings.TrimPrefix(line, "artist=")
 		}
 		if strings.HasPrefix(line, "album=") {
-			currentAlbum = strings.TrimPrefix(line, "album=")
+			album = strings.TrimPrefix(line, "album=")
 		}
 	}
-	if currentTitle != "" {
-		currentPlaying = true
-	}
+	currentTitle, currentArtist, currentAlbum = title, artist, album
 }

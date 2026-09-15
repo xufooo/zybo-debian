@@ -13,6 +13,30 @@ import (
 
 var startTime = time.Now()
 
+// ── "Is it playing?" -- the sound card is the only honest signal ───────
+//
+// This used to be an in-memory flag: set when a source was selected, set again
+// when metadata appeared with a title, and NEVER cleared -- while a backend
+// restart reset it to false. The panel therefore said "No source connected"
+// while music was playing, or "airplay connected" while nothing was playing
+// (reported on hardware, 2026-09-15).
+//
+// Every source (AirPlay / Bluetooth / local MPD) ends up writing the same sound
+// card, so the card's PCM state is the honest answer: `state: RUNNING` means
+// audio is actually flowing (the driver writes "closed" when the device is not
+// open). One /proc file read, microseconds, no side effects.
+//
+// It is a variable so tests can point it at a fixture file instead of a board.
+var pcmStatusPath = "/proc/asound/card0/pcm0p/sub0/status"
+
+func systemIsPlaying() bool {
+	out, err := ioutilReadFile(pcmStatusPath)
+	if err != nil {
+		return false // no such file (no card / wrong path) means not playing
+	}
+	return strings.Contains(string(out), "state: RUNNING")
+}
+
 // ── System status ─────────────────────────────────────────────────────
 
 func getSystemStatus() SystemStatus {
@@ -86,7 +110,8 @@ func buildStatus() APIStatus {
 		Title:   currentTitle,
 		Artist:  currentArtist,
 		Album:   currentAlbum,
-		Playing: currentPlaying,
+		// Ask the sound card, not an in-memory flag (see systemIsPlaying)
+		Playing: systemIsPlaying(),
 		// Read the mixer back: the WebUI/REST writes it and bluealsa-aplay
 		// (Bluetooth) moves it (AirPlay no longer touches it since
 		// ignore_volume_control=yes), so the UI must follow it.

@@ -115,8 +115,8 @@
   <!-- Now Playing ─────────────────────────────────────── -->
   <div class="card" id="now-playing">
     <div class="art" id="art">🎵</div>
-    <div class="title" id="np-title">No source connected</div>
-    <div class="artist" id="np-artist">Select a source to start playing</div>
+    <div class="title" id="np-title">Not playing</div>
+    <div class="artist" id="np-artist">No source selected</div>
     <div><span class="source-badge" id="source-badge">Idle</span></div>
   </div>
 
@@ -186,6 +186,19 @@ const freqLabels = ['60','150','400','1k','3k','10k'];
 const presetNames = ['flat','rock','jazz','classical','vocal','bass'];
 const API = '';
 
+// Source display names plus a hint on how to start that source.
+// Do NOT say "connected": the backend only knows which source is SELECTED, not
+// whether a phone has actually connected (only state.playing means audio is
+// flowing -- see systemIsPlaying in backend/status.go). The subtitle used to
+// claim "airplay connected" from the selection alone, while the title claimed
+// "No source connected" whenever nothing was playing: the two contradicted.
+const SRC_LABEL = { airplay:'AirPlay', bluetooth:'Bluetooth', dlna:'DLNA' };
+const SRC_HINT = {
+  airplay:   'Pick ZYBO Audio on your phone',
+  bluetooth: 'Connect ZYBO Audio on your phone',
+  dlna:      'Waiting for a push',
+};
+
 // ── DOM refs ──────────────────────────────────────────────────────────
 function $(id){ return document.getElementById(id) }
 function setText(id,t){ const e=$(id); if(e)e.textContent=t }
@@ -222,12 +235,16 @@ function connectWS(){
 
 // ── Render ────────────────────────────────────────────────────────────
 function render(){
-  // now-playing
-  setText('np-title', state.title || (state.playing ? 'Playing...' : 'No source connected'));
+  // now-playing: the title says whether audio is playing, the subtitle says what
+  // it is / how to start it, and the badge says which source is selected. One
+  // statement each, so they can no longer contradict each other.
+  setText('np-title', state.playing ? (state.title || 'Playing...') : 'Not playing');
   setText('np-artist', state.artist ? state.artist+(state.album?' — '+state.album:'') :
-    (state.source==='idle'?'Select a source to start playing':state.source+' connected'));
+    state.source==='idle' ? 'No source selected' :
+    state.playing ? ((SRC_LABEL[state.source]||state.source)+' playing') :
+    (SRC_HINT[state.source]||'Waiting to play'));
   $('source-badge').textContent = state.source==='idle' ? 'Idle' :
-    state.source==='airplay' ? 'AirPlay' : state.source==='dlna' ? 'DLNA' : 'Bluetooth';
+    (SRC_LABEL[state.source]||state.source);
   $('source-badge').style.background = state.source==='idle'?'#25253e':'#2a2a4e';
 
   // source buttons
