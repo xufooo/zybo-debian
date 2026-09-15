@@ -91,7 +91,13 @@ var (
 	dspAvailable bool
 
 	// Software-side limiter state (kept in sync with the registers, shown by /api/status)
-	dspLimiterEnabled = true
+	// Off by default since 2026-09-15: a bit-exact fixed-point model of limiter.v run over
+	// real 0 dBFS material rewrites the waveform about 1770 times per second (median
+	// discontinuity -40 dBFS, peak -14 dBFS), which is audible grit on full-scale sources.
+	// The limiter exists to catch EQ-boost overshoot, and the automatic preamp already
+	// guarantees that the cascade stays below -3 dBFS, so it only does harm now. It can
+	// still be switched on from the UI.
+	dspLimiterEnabled = false
 	dspLimiterThrDB   = limDefaultThrDB
 	dspLimiterAttMs   = limDefaultAttMs
 	dspLimiterRelMs   = limDefaultRelMs
