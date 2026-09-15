@@ -9,24 +9,34 @@
 #   /etc/shairport-sync.conf fixed it, but only on that one board: reflashing
 #   the image loses them. This hook moves that configuration into the rootfs build.
 #
-# Two settings are pinned (both in the 4.x `general` section):
+# Three settings are pinned (all in the 4.x `general` section):
 #
-#   1. interpolation = "basic"
-#      By default shairport-sync's +/-1 frame drift correction goes through soxr,
-#      and soxr_oneshot() rebuilds its filter every time. On this 650 MHz
-#      Cortex-A9 one resample takes about 22.35 ms, just under the 30 ms
-#      selection threshold, so soxr gets chosen; one thread then spins at 105%
-#      CPU and the DAC queue underruns (Min DAC Queue = 0).
-#      With "basic" (linear interpolation that inserts/drops whole frames) CPU
-#      drops from 105% to 16.5% and the DAC queue holds around 0.96 s, with no
-#      missing or late frames. A +/-1 frame correction is inaudible with linear
-#      interpolation, and the shairport-sync documentation also recommends
-#      basic/vernier on slow CPUs.
+#   1. interpolation = "soxr"
+#      shairport-sync continuously resamples the incoming stream to track the
+#      sender's clock against the DAC's (it measured a ~965 ppm correction on
+#      this board). That resampler must be a real one: with "basic" (linear
+#      interpolation) the correction is AUDIBLE as continuous ticking on every
+#      AirPlay stream -- confirmed by ear on the board (2026-09-15), after two
+#      other causes had been ruled out.
+#      The default is soxr, and soxr_oneshot() rebuilds its filter each time:
+#      one resample costs ~22.35 ms on this 650 MHz Cortex-A9, just under
+#      shairport's 30 ms soxr_delay_threshold, so one thread spins at ~105% CPU.
+#      That CPU cost is accepted here; shairport falls back to the cheap
+#      interpolator by itself if the DAC queue drops below that threshold.
 #
-#   2. general.audio_backend_buffer_desired_length_in_seconds = 1.0
+#   2. general.audio_backend_buffer_desired_length_in_seconds = 0.4
 #      The default 0.2 s is drained by WiFi jitter on this machine (roaming
-#      between BSSIDs of the same SSID). At 1.0 s the queue stays around 0.96 s;
-#      the only cost is a slightly slower volume response, acceptable here.
+#      between BSSIDs of the same SSID), but the 1.0 s this used to be adds a
+#      full second to the play/pause delay on top of AirPlay's own 2 s. 0.4 s
+#      held a stable queue in testing and keeps the total delay near 2.4 s.
+#
+#   3. general.ignore_volume_control = "yes"
+#      The board has one volume knob (the WebUI writes the codec's Master
+#      control) and every source plays at unity into it. If shairport instead
+#      applies the sender's volume in software, the phone's -20 dB lands on
+#      shairport's own -96 dB scale, i.e. about -64 dB: AirPlay becomes far
+#      quieter than every other source and the codec's noise floor dominates
+#      once the board volume is turned up.
 #
 # Also cleaned up: diagnostic settings enabled while debugging must not reach a
 # release image --
@@ -57,19 +67,28 @@ if [ ! -f "$CONF" ]; then
 
 general =
 {
-	// 650MHz Cortex-A9: a soxr resample costs ~22.35ms (the 30ms threshold is
-	// just met, so soxr is picked) and one thread spins at 105% CPU. "basic"
-	interpolation = "basic";
-	// linear interpolation is nearly free and a +/-1 frame correction is inaudible; the 0.2s default buffer underruns under WiFi jitter.
-	audio_backend_buffer_desired_length_in_seconds = 1.0;
-	// One system volume: the AirPlay volume drives the codec's ALSA "Master" control
-	// (see the alsa section below), never that control's +5 dB top end. The codec's
-	// master control maps raw 48..127 to -74..+5 dB, so the useful ceiling is 0 dB
-	// (anything above it is digital gain, i.e. clipping).
+	// Clock-drift correction must use a real resampler. shairport continuously
+	// resamples to track the sender's clock (~965 ppm on this board); with "basic"
+	// (linear interpolation) that is AUDIBLE as continuous ticking. soxr costs
+	// ~22.35 ms per resample (just under shairport's own 30 ms threshold) and one
+	// thread spins at ~105% CPU -- accepted, it is the only setting that is clean.
+	interpolation = "soxr";
+	// Play/pause delay: AirPlay itself contributes 2 s. The 0.2s default underruns
+	// under WiFi jitter, but 1.0s added a full second of delay; 0.4s held a stable
+	// queue in testing.
+	audio_backend_buffer_desired_length_in_seconds = 0.4;
+	// The board has exactly one volume knob: the WebUI writes the codec's ALSA
+	// "Master" control and every source plays at unity into it. If shairport applies
+	// the sender's volume in software instead, the phone's -20 dB lands on
+	// shairport's own -96 dB scale (~-64 dB) and AirPlay becomes inaudible next to
+	// the other sources -- so ignore the sender's volume.
+	ignore_volume_control = "yes";
+	// Never use that control's +5 dB top end: the codec Master maps raw 48..127 to
+	// -74..+5 dB, so anything above 0 dB is digital gain, i.e. clipping.
 	volume_max_db = 0.0;
-	// The control's *native* dB range is not usable: ALSA cannot map raw 0..47 at all
-	// (it reports -99999.99 dB), and a session volume written into that region is
-	// silence. Pin the range instead of letting shairport derive it from the mixer.
+	// Its *native* dB range is not usable either: ALSA cannot map raw 0..47 at all
+	// (it reports -99999.99 dB) and a value written there is silence. Pin the range
+	// instead of letting shairport derive it from the mixer.
 	volume_range_db = 60;
 };
 
@@ -90,15 +109,17 @@ BEGIN {
 
     nsec = 2; slist[1] = "general"; slist[2] = "diagnostics"
 
-    nw["general"] = 4
+    nw["general"] = 5
     wkey["general", 1] = "interpolation"
-    wval["general", 1] = "\tinterpolation = \"basic\"; // on a 650MHz A9 a soxr resample costs 22.35ms (30ms threshold); basic linear interpolation costs almost no CPU"
+    wval["general", 1] = "\tinterpolation = \"soxr\"; // the drift correction must be a real resampler: \"basic\" (linear interpolation) is audible as continuous ticking"
     wkey["general", 2] = "audio_backend_buffer_desired_length_in_seconds"
-    wval["general", 2] = "\taudio_backend_buffer_desired_length_in_seconds = 1.0; // tolerates WiFi jitter; the 0.2s default underruns, the queue holds around 0.96s"
-    wkey["general", 3] = "volume_max_db"
-    wval["general", 3] = "\tvolume_max_db = 0.0; // one system volume: never use the +5 dB top end of the codec Master control (that is digital gain, i.e. clipping)"
-    wkey["general", 4] = "volume_range_db"
-    wval["general", 4] = "\tvolume_range_db = 60; // pin the range: the native dB range of the mixer is unusable (ALSA cannot map raw 0..47, so a session volume could land in silence)"
+    wval["general", 2] = "\taudio_backend_buffer_desired_length_in_seconds = 0.4; // 0.2s underruns under WiFi jitter, 1.0s added a whole second to the play/pause delay; 0.4s was stable"
+    wkey["general", 3] = "ignore_volume_control"
+    wval["general", 3] = "\tignore_volume_control = \"yes\"; // one volume knob, on the board: a sender volume would land on the -96 dB software scale of shairport (~-64 dB) and make AirPlay inaudible"
+    wkey["general", 4] = "volume_max_db"
+    wval["general", 4] = "\tvolume_max_db = 0.0; // one system volume: never use the +5 dB top end of the codec Master control (that is digital gain, i.e. clipping)"
+    wkey["general", 5] = "volume_range_db"
+    wval["general", 5] = "\tvolume_range_db = 60; // pin the range: the native dB range of the mixer is unusable (ALSA cannot map raw 0..47, so a session volume could land in silence)"
 
 
     nw["diagnostics"] = 2
@@ -185,13 +206,15 @@ fi
 # board's own volume lives in the codec mixer written only by the WebUI.
 sed -i 's|^[[:space:]]*mixer_control_name[[:space:]]*=.*|// mixer_control_name removed by customize03: the board keeps its own volume (see customize04-volume.sh)|' "$CONF"
 
-# --- Verify: all four keys are in place and no diagnostic key holds a debugging value ---
+# --- Verify: all keys are in place and no diagnostic key holds a debugging value ---
 fail() { echo "[hook] ERROR: shairport-sync config validation failed: $1" >&2; exit 1; }
 
-grep -qE '^[[:space:]]*interpolation[[:space:]]*=[[:space:]]*"basic"[[:space:]]*;' "$CONF" \
-    || fail 'interpolation is not "basic"'
-grep -qE '^[[:space:]]*audio_backend_buffer_desired_length_in_seconds[[:space:]]*=[[:space:]]*1\.0[[:space:]]*;' "$CONF" \
-    || fail 'audio_backend_buffer_desired_length_in_seconds is not 1.0'
+grep -qE '^[[:space:]]*interpolation[[:space:]]*=[[:space:]]*"soxr"[[:space:]]*;' "$CONF" \
+    || fail 'interpolation is not "soxr" (with "basic" the linear-interpolation drift correction is audible as ticking)'
+grep -qE '^[[:space:]]*audio_backend_buffer_desired_length_in_seconds[[:space:]]*=[[:space:]]*0\.4[[:space:]]*;' "$CONF" \
+    || fail 'audio_backend_buffer_desired_length_in_seconds is not 0.4'
+grep -qE '^[[:space:]]*ignore_volume_control[[:space:]]*=[[:space:]]*"yes"[[:space:]]*;' "$CONF" \
+    || fail 'ignore_volume_control is not "yes" (the sender volume would make AirPlay ~64 dB quieter than every other source)'
 grep -qE '^[[:space:]]*log_verbosity[[:space:]]*=[[:space:]]*0[[:space:]]*;' "$CONF" \
     || fail 'diagnostics.log_verbosity is not 0'
 grep -qE '^[[:space:]]*statistics[[:space:]]*=[[:space:]]*"no"[[:space:]]*;' "$CONF" \
@@ -207,13 +230,13 @@ grep -qE '^[[:space:]]*volume_range_db[[:space:]]*=[[:space:]]*60[[:space:]]*;' 
     || fail 'general.volume_range_db is not 60 (the mixer native dB range is unusable: raw 0..47 has no dB mapping)'
 
 # The same key must not appear twice in a section (libconfig fails to parse and shairport-sync will not start)
-for k in interpolation audio_backend_buffer_desired_length_in_seconds log_verbosity statistics \
-         volume_max_db volume_range_db; do
+for k in interpolation audio_backend_buffer_desired_length_in_seconds ignore_volume_control \
+         log_verbosity statistics volume_max_db volume_range_db; do
     n="$(grep -cE "^[[:space:]]*${k}[[:space:]]*=" "$CONF" || true)"
     [ "$n" -eq 1 ] || fail "key $k appears $n times (must be exactly 1; duplicate keys make shairport-sync refuse to start)"
 done
 
 echo "[hook] shairport-sync configuration applied"
-grep -nE '^[[:space:]]*(interpolation|audio_backend_buffer_desired_length_in_seconds|log_verbosity|statistics|volume_max_db|volume_range_db)[[:space:]]*=' "$CONF" | sed 's/^/  /'
+grep -nE '^[[:space:]]*(interpolation|audio_backend_buffer_desired_length_in_seconds|ignore_volume_control|log_verbosity|statistics|volume_max_db|volume_range_db)[[:space:]]*=' "$CONF" | sed 's/^/  /'
 n_mixer="$(grep -cE '^[[:space:]]*mixer_control_name[[:space:]]*=' "$CONF" || true)"
 echo "[hook] shairport-sync does not own the codec mixer (active mixer_control_name lines: $n_mixer)"

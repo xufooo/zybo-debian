@@ -59,6 +59,10 @@ grep -qE '^[[:space:]]*volume_max_db[[:space:]]*=[[:space:]]*0(\.0)?[[:space:]]*
     || fail 'shairport-sync general.volume_max_db is not 0.0'
 grep -qE '^[[:space:]]*volume_range_db[[:space:]]*=[[:space:]]*60[[:space:]]*;' "$SH" \
     || fail 'shairport-sync general.volume_range_db is not 60'
+# The sender's volume must be ignored outright: applied in software it lands on
+# shairport's own -96 dB scale, so AirPlay ends up ~64 dB below every other source.
+grep -qE '^[[:space:]]*ignore_volume_control[[:space:]]*=[[:space:]]*"yes"[[:space:]]*;' "$SH" \
+    || fail 'shairport-sync general.ignore_volume_control is not "yes" (AirPlay would be ~64 dB quieter than the other sources)'
 
 MPD="$TARGET/etc/mpd.conf"
 [ -f "$MPD" ] || fail "missing $MPD"

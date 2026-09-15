@@ -35,19 +35,22 @@ cnt() { # cnt <description> <file> <key> <expected count>
     if [ "$n" -eq "$4" ]; then ok "$1"; else bad "$1 ($3 appears $n times, expected $4)"; fi
 }
 
-# Shared assertions for the six release settings
+# Shared assertions for the release settings
 assert_release() { # assert_release <case name> <file>
-    has "$1: interpolation=basic"      "$2" '^[[:space:]]*interpolation[[:space:]]*=[[:space:]]*"basic"[[:space:]]*;'
-    has "$1: buffer=1.0"               "$2" '^[[:space:]]*audio_backend_buffer_desired_length_in_seconds[[:space:]]*=[[:space:]]*1\.0[[:space:]]*;'
+    has "$1: interpolation=soxr"       "$2" '^[[:space:]]*interpolation[[:space:]]*=[[:space:]]*"soxr"[[:space:]]*;'
+    has "$1: buffer=0.4"               "$2" '^[[:space:]]*audio_backend_buffer_desired_length_in_seconds[[:space:]]*=[[:space:]]*0\.4[[:space:]]*;'
+    has "$1: ignore_volume_control=yes" "$2" '^[[:space:]]*ignore_volume_control[[:space:]]*=[[:space:]]*"yes"[[:space:]]*;'
     has "$1: log_verbosity=0"          "$2" '^[[:space:]]*log_verbosity[[:space:]]*=[[:space:]]*0[[:space:]]*;'
     has "$1: statistics=no"            "$2" '^[[:space:]]*statistics[[:space:]]*=[[:space:]]*"no"[[:space:]]*;'
     has "$1: volume_max_db=0.0"        "$2" '^[[:space:]]*volume_max_db[[:space:]]*=[[:space:]]*0(\.0)?[[:space:]]*;'
     has "$1: volume_range_db=60"       "$2" '^[[:space:]]*volume_range_db[[:space:]]*=[[:space:]]*60[[:space:]]*;'
+    nhas "$1: no interpolation=basic"  "$2" '^[[:space:]]*interpolation[[:space:]]*=[[:space:]]*"basic"'
     nhas "$1: no verbosity=3"          "$2" '^[[:space:]]*log_verbosity[[:space:]]*=[[:space:]]*3'
     nhas "$1: no statistics=yes"       "$2" '^[[:space:]]*statistics[[:space:]]*=[[:space:]]*"yes"'
     nhas "$1: no log_output_to=stderr" "$2" '^[[:space:]]*log_output_to[[:space:]]*=[[:space:]]*"stderr"'
     cnt  "$1: interpolation unique"   "$2" 'interpolation' 1
     cnt  "$1: buffer unique"          "$2" 'audio_backend_buffer_desired_length_in_seconds' 1
+    cnt  "$1: ignore_volume_control unique" "$2" 'ignore_volume_control' 1
     cnt  "$1: log_verbosity unique"   "$2" 'log_verbosity' 1
     cnt  "$1: statistics unique"      "$2" 'statistics' 1
     # Separate volumes: shairport must NOT drive the codec mixer
