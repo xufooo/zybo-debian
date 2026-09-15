@@ -166,21 +166,26 @@ EOF
 # --- ALSA default device: software resample to 48kHz (MCLK fixed at 12.288MHz) ---
 # The format must be S32_LE: in DMA mode axi-i2s only exposes S32_LE (verified on the board)
 #
-# Rate converter: without libasound2-plugins the only converter available is alsa-lib's
-# built-in "linear" interpolation, which costs about 41 dB of SNR on 44.1 kHz material
-# (measured against a high-precision soxr reference). libasound2-plugins provides
-# ffmpeg's polyphase resampler, which measures ~86 dB SNR for ~6% CPU on this 650 MHz
-# Cortex-A9, so every 44.1 kHz source (AirPlay, Bluetooth, mpd) gets a transparent
-# conversion instead of a 7-bit one.
-# "lavrate_higher" is the 64-tap setting of that converter ("lavrate_high" is 32 taps,
-# "lavrate" 16); the two measure the SAME cost on the board (6.1% vs 5.9%), so the
-# longer filter is taken for free.
-# The alternatives were measured and rejected: samplerate_best and speexrate_best
-# cannot keep up in real time (3.0x / 1.4x the audio duration, i.e. they underrun),
-# samplerate_medium costs ~42% CPU, and samplerate_linear is no better than the
-# built-in linear converter.
+# Rate converter: this choice is NOT cosmetic. The I2S hardware only runs the 48 kHz
+# family (MCLK = 12.288 MHz, LRCLK = MCLK/256), so every 44.1 kHz source (AirPlay is
+# always 44.1 kHz, Bluetooth A2DP, most music files) is converted by ALSA's plug.
+#
+# Verified on the board with a pure 400 Hz sine, A/B across four converters, judged by ear:
+#   linear          clean
+#   lavrate_higher  AUDIBLE TICKING  <-- the ffmpeg/libswresample one
+#   samplerate      clean            <-- chosen
+#   speexrate       clean
+# "lavrate_higher" (ffmpeg's polyphase resampler via libasound2-plugins) inserts periodic
+# gaps in the 44.1k -> 48k stream, which is heard as continuous ticking on ALL 44.1 kHz
+# playback. This was the actual cause of a long "AirPlay is noisy" report; note it is
+# invisible to in-band measurements that put an ALSA `file` tap under the rate plugin
+# (that combination produces its own artefacts), so the converter must be verified by ear.
+#
+# "samplerate" is libsamplerate's SRC_SINC_FASTEST: clean, and ~15% CPU on this 650 MHz
+# Cortex-A9. Anything above it (samplerate_medium/best, speexrate_best) cannot keep real
+# time here, and "linear" is clean but only ~41 dB SNR.
 cat > "$TARGET/etc/asound.conf" <<'EOF'
-defaults.pcm.rate_converter "lavrate_higher"
+defaults.pcm.rate_converter "samplerate"
 
 pcm.!default {
     type plug
