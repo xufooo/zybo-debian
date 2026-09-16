@@ -11,12 +11,16 @@
        background:#0f0f1a;color:#e0e0e0;min-height:100vh;
        display:flex;justify-content:center;padding:12px;
        -webkit-tap-highlight-color:transparent}
-  .app{width:100%;max-width:420px;display:flex;flex-direction:column;gap:16px}
+  .app{width:100%;max-width:420px;display:flex;flex-direction:column;gap:14px}
 
   /* header */
   .header{text-align:center;padding:4px 0;
           font-size:13px;color:#9a9ab0;letter-spacing:2px;text-transform:uppercase}
   .header #app-ver{font-size:10px;letter-spacing:1px;color:#8f95a8}
+  /* Engine self-description: every "is this available" decision in the UI comes
+     from here instead of being hardcoded. */
+  .engine-line{text-align:center;font-size:10px;color:#7d8299;line-height:1.5}
+  .engine-line b{color:#8f95a8;font-weight:600}
 
   /* now-playing card */
   .card{background:#1a1a2e;border-radius:14px;padding:16px;text-align:center}
@@ -41,44 +45,107 @@
   .src-btn:disabled{opacity:.35;cursor:not-allowed}
   .src-btn:disabled:active{transform:none}
 
-  /* eq section */
+  /* generic panels and titles */
   .section-title{font-size:11px;color:#9a9ab0;letter-spacing:3px;
-                 text-transform:uppercase;text-align:center;margin-bottom:4px}
-  .eq-panel{background:#1a1a2e;border-radius:14px;padding:16px 12px}
-  .eq-sliders{display:flex;justify-content:space-between;gap:2px;height:140px}
-  .eq-col{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px}
-  /* Vertical sliders: rotate a horizontal slider by -90deg. The outer .track only
-     reserves space, so the slider's layout width is just 28px.
-     Do NOT reintroduce the old `width:120px + writing-mode:bt-lr +
-     -webkit-appearance:slider-vertical` hack: its layout width is still 120px, the
-     flex column stretches to 120px and 6 columns total 764px, which overflows on phones. */
-  .eq-col .track{position:relative;width:28px;height:120px}
-  .eq-col input[type=range]{position:absolute;top:50%;left:50%;
-       width:120px;height:28px;margin:0;
-       transform:translate(-50%,-50%) rotate(-90deg);
-       -webkit-appearance:none;appearance:none;background:transparent;outline:none}
-  .eq-col input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;
-       background:linear-gradient(to right,#25253e,#7c8aff)}
-  .eq-col input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;
-       width:24px;height:24px;border-radius:50%;background:#fff;
-       border:3px solid #7c8aff;box-shadow:0 2px 8px rgba(0,0,0,.3);margin-top:-9px}
-  .eq-col input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:#25253e}
-  .eq-col input[type=range]::-moz-range-progress{height:6px;border-radius:3px;background:#7c8aff}
-  .eq-col input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;
-       background:#fff;border:3px solid #7c8aff}
-  .eq-col .val{font-size:10px;color:#7c8aff;font-weight:600;
-               font-variant-numeric:tabular-nums}
-  .eq-col .lbl{font-size:10px;color:#9a9ab0}
+                 text-transform:uppercase;text-align:center;margin-bottom:-6px}
+  .panel{background:#1a1a2e;border-radius:14px;padding:14px 12px}
+
+  /* Notice bar: whatever the backend says is shown verbatim
+     ("does not fit" / "not supported" is never dropped silently). */
+  .notice{border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.5;
+          background:#3a2530;color:#f0a8b4;border:1px solid #5c3540}
+  .notice.warn{background:#3a3525;color:#e8cf9a;border-color:#5c5232}
+  .notice.ok{background:#223a2c;color:#9fd8b4;border-color:#2f5540}
+  .notice .nt-h{font-weight:700;margin-bottom:3px}
+  .notice ul{margin:4px 0 0 16px}
+
+  /* wizard */
+  .wiz-steps{display:flex;gap:6px;justify-content:center;margin-bottom:10px}
+  .wiz-dot{width:22px;height:22px;border-radius:50%;background:#25253e;color:#8f95a8;
+           font-size:11px;font-weight:700;display:flex;align-items:center;
+           justify-content:center;cursor:pointer;border:1px solid transparent}
+  .wiz-dot.active{background:#1a1a3e;color:#7c8aff;border-color:#7c8aff}
+  .wiz-dot.done{color:#9fd8b4}
+  .wiz-q{font-size:13px;color:#c9c9dc;margin-bottom:8px;text-align:center}
+  .wiz-opts{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+  .wiz-actions{display:flex;gap:6px;justify-content:center;margin-top:12px}
+  .wiz-out{margin-top:10px;font-size:11px;color:#9a9ab0;line-height:1.6}
+  .wiz-out .ab{display:flex;gap:6px;justify-content:center;margin-top:8px}
+  .wiz-out .ab button{flex:1}
+
+  /* buttons */
+  .btn{padding:8px 14px;min-height:32px;border-radius:8px;background:#25253e;
+       border:1px solid transparent;color:#999;font-size:11px;font-weight:600;
+       cursor:pointer;transition:all .15s}
+  .btn.active{border-color:#7c8aff;color:#7c8aff}
+  .btn:active{transform:scale(.96)}
+  .btn:disabled{opacity:.35;cursor:not-allowed}
+  .btn:disabled:active{transform:none}
+  .btn.primary{background:#2a2a4e;color:#a8b0ff}
+  .btn.danger:hover{border-color:#c4646e;color:#c4646e}
+  .btn.sm{padding:5px 9px;min-height:26px;font-size:10px}
+
+  /* effect cards */
+  .cards{display:flex;flex-direction:column;gap:8px}
+  .fx-card{background:#1a1a2e;border-radius:12px;padding:12px;
+           border:1px solid transparent;transition:border-color .15s}
+  .fx-card.on{border-color:#3d5a8a}
+  .fx-card.grey{opacity:.5}
+  .fx-head{display:flex;align-items:flex-start;gap:10px}
+  .fx-main{flex:1;min-width:0;cursor:pointer}
+  .fx-name{font-size:13px;font-weight:600;color:#dcdcf0;
+           display:flex;align-items:center;gap:6px}
+  .fx-tag{font-size:9px;padding:1px 5px;border-radius:6px;background:#25253e;
+          color:#8f95a8;font-weight:600}
+  .fx-desc{font-size:11px;color:#8f95a8;margin-top:3px;line-height:1.45}
+  .fx-why{font-size:10px;color:#c9a06a;margin-top:4px;line-height:1.45}
+  /* Switch: a button rather than <input type=checkbox> so tests can click it. */
+  .fx-sw{width:42px;height:24px;border-radius:12px;background:#25253e;border:none;
+         position:relative;cursor:pointer;flex:0 0 auto;transition:background .15s}
+  .fx-sw::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;
+                border-radius:50%;background:#8f95a8;transition:all .15s}
+  .fx-sw.on{background:#3d5a8a}
+  .fx-sw.on::after{left:21px;background:#fff}
+  .fx-cfg{margin-top:10px;padding-top:10px;border-top:1px solid #25253e;
+          display:flex;flex-direction:column;gap:8px}
+  .fx-cfg .strength{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .fx-cfg .strength .lb{font-size:10px;color:#8f95a8;margin-right:2px}
+  /* Parameter row (freq/gain/Q): shared by an expanded card and the chain editor. */
+  .param-row{display:flex;gap:6px;align-items:center}
+  .param-row .pf{flex:1.3;min-width:0}
+  .param-row .pg{flex:1.1;min-width:0}
+  .param-row .pq{flex:.9;min-width:0}
+  .param-row input[type=number]{width:100%;background:#25253e;border:1px solid #2f2f48;
+        border-radius:7px;color:#dcdcf0;font-size:11px;padding:6px 7px;
+        font-variant-numeric:tabular-nums}
+  .param-row input[type=number]:focus{outline:none;border-color:#7c8aff}
+  .param-row .unit{font-size:9px;color:#6f7590}
+  .chain-meta{font-size:10px;color:#8f95a8;text-align:center}
+  .chain-meta.over{color:#f0a8b4}
+  .chain-list{display:flex;flex-direction:column;gap:6px}
+  .chain-row{display:flex;gap:6px;align-items:center}
+  .chain-row .rm{flex:0 0 auto}
 
   /* presets */
-  .presets{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px}
-  .pst-btn{padding:8px 14px;min-height:32px;border-radius:8px;background:#25253e;
-            border:1px solid transparent;color:#999;font-size:11px;
-            font-weight:600;cursor:pointer;transition:all .15s}
-  .pst-btn.active{border-color:#7c8aff;color:#7c8aff}
-  .pst-btn:active{transform:scale(.96)}
+  .pst-list{display:flex;flex-wrap:wrap;gap:6px}
+  .pst-item{position:relative;display:flex;align-items:center;gap:6px;
+            background:#25253e;border-radius:9px;padding:7px 9px;
+            border:1px solid transparent}
+  .pst-item.active{border-color:#7c8aff}
+  .pst-item.grey{opacity:.5}
+  .pst-item .nm{font-size:11px;font-weight:600;color:#c9c9dc;cursor:pointer;
+                max-width:150px;overflow:hidden;text-overflow:ellipsis;
+                white-space:nowrap}
+  .pst-item.active .nm{color:#a8b0ff}
+  .pst-item .mini{font-size:9px;color:#7d8299}
+  .pst-item .acts{display:flex;gap:3px}
+  .pst-item .acts button{background:transparent;border:none;color:#7d8299;
+        font-size:11px;cursor:pointer;padding:2px 3px;border-radius:5px}
+  .pst-item .acts button:hover{color:#a8b0ff;background:#1a1a2e}
+  .pst-sec{font-size:10px;color:#7d8299;margin:8px 0 5px}
+  .pst-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:10px}
 
-  /* volume */
+  /* limiter */
   .vol-row{display:flex;align-items:center;gap:10px;padding:4px 8px}
   .vol-row .icon{font-size:22px}
   .vol-row input[type=range]{flex:1;height:6px;border-radius:3px;background:#25253e;
@@ -91,10 +158,21 @@
   .vol-row input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;
        background:#fff;border:2px solid #7c8aff}
   .vol-row .pct{font-size:14px;font-weight:600;color:#7c8aff;min-width:36px;text-align:right}
+  .vol-row .db{font-size:11px;color:#8b8ba7;min-width:44px;text-align:right}
+  .row-wrap{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+  .hint{font-size:10px;color:#7d8299;line-height:1.5;margin-top:6px;text-align:center}
 
   /* status bar */
   .status-bar{display:flex;justify-content:center;gap:16px;
                font-size:10px;color:#8f95a8;padding:4px 0}
+  /* Reboot: kept at the very bottom and visually muted, so it is hard to hit by
+     accident -- rebooting during playback cuts the sound. */
+  .sys-row{display:flex;align-items:center;justify-content:center;gap:10px;
+             font-size:10px;color:#8f95a8;padding:6px 0 0}
+  .sys-btn{padding:5px 12px;border-radius:7px;background:transparent;
+             border:1px solid #3a3a55;color:#8f95a8;font-size:11px;cursor:pointer}
+  .sys-btn:hover{border-color:#c4646e;color:#c4646e}
+  .sys-btn:disabled{opacity:.5;cursor:default}
 </style>
 </head>
 <body>
@@ -102,12 +180,13 @@
 <div class="app">
 
   <div class="header">ZYBO Audio <span id="app-ver"></span></div>
+  <div class="engine-line" id="engine-line"></div>
 
   <!-- Now Playing ─────────────────────────────────────── -->
   <div class="card" id="now-playing">
     <div class="art" id="art">🎵</div>
-    <div class="title" id="np-title">No source connected</div>
-    <div class="artist" id="np-artist">Select a source to start playing</div>
+    <div class="title" id="np-title">Not playing</div>
+    <div class="artist" id="np-artist">No source selected</div>
     <div><span class="source-badge" id="source-badge">Idle</span></div>
   </div>
 
@@ -119,33 +198,73 @@
     <button class="src-btn"         data-src="bluetooth" id="src-bt">🎧 Bluetooth</button>
   </div>
 
-  <!-- EQ Panel ────────────────────────────────────────── -->
-  <div class="eq-panel" id="eq-panel">
-    <div class="section-title">Equalizer</div>
-    <div class="eq-sliders" id="eq-sliders"></div>
-    <div class="presets" id="presets"></div>
-    <div style="display:flex;gap:6px;justify-content:center;margin-top:4px">
-      <button class="pst-btn" id="btn-import" title="Import REW/AutoEQ/JSON config">📥 Import</button>
-      <a class="pst-btn" id="btn-export" href="/api/dsp/export?format=rew" download style="text-decoration:none">📤 Export REW</a>
-      <input type="file" id="file-import" accept=".txt,.json" style="display:none">
+  <!-- Notice bar: errors and warnings appear here instead of alert()
+       (alert() would swallow the text under jsdom). -->
+  <div class="notice" id="notice" hidden></div>
+
+  <!-- Wizard ──────────────────────────────────────────── -->
+  <div class="section-title">Sound wizard</div>
+  <div class="panel" id="wizard">
+    <div class="wiz-steps" id="wiz-dots"></div>
+    <div class="wiz-q" id="wiz-q"></div>
+    <div class="wiz-opts" id="wiz-opts"></div>
+    <div class="wiz-actions" id="wiz-actions"></div>
+    <div class="wiz-out" id="wiz-out"></div>
+  </div>
+
+  <!-- Effect cards ────────────────────────────────────── -->
+  <div class="section-title">Effects</div>
+  <div class="cards" id="cards"></div>
+
+  <!-- Current chain (editable; a card just adds its curve's bands here) ── -->
+  <div class="section-title">Current chain</div>
+  <div class="panel">
+    <div class="chain-meta" id="chain-meta"></div>
+    <div class="chain-list" id="chain-list"></div>
+    <div class="row-wrap">
+      <button class="btn sm" id="btn-add-band">＋ Add a band</button>
+      <button class="btn sm" id="btn-chain-clear">Clear (flat)</button>
     </div>
   </div>
 
+  <!-- Presets ─────────────────────────────────────────── -->
+  <div class="section-title">Presets</div>
+  <div class="panel">
+    <div class="pst-list" id="preset-list"></div>
+    <div class="pst-row">
+      <button class="btn" id="btn-save-preset">💾 Save as my preset</button>
+      <button class="btn" id="btn-import" title="Import a custom JSON preset, REW text or AutoEQ text">📥 Import</button>
+      <a class="btn" id="btn-export-rew" href="/api/dsp/export?format=rew" download
+         style="text-decoration:none;display:inline-flex;align-items:center">📤 Export EQ (REW)</a>
+      <input type="file" id="file-import" accept=".txt,.json" style="display:none">
+    </div>
+    <div class="hint" id="preset-hint"></div>
+  </div>
+
   <!-- Limiter ─────────────────────────────────────────── -->
-  <div class="section-title">Limiter (anti-clipping)</div>
-  <div class="vol-row">
-    <button class="pst-btn" id="lim-toggle">Limiter on</button>
-    <input type="range" id="lim-thr" min="-24" max="0" value="-1" step="0.5">
-    <span class="pct" id="lim-thr-val">-1.0 dBFS</span>
+  <div class="section-title">Limiter (clip protection)</div>
+  <div class="panel">
+    <div class="row-wrap" style="margin-top:0">
+      <button class="btn" id="lim-toggle">Limiter off</button>
+      <button class="btn" id="lim-mode-feedback">Legacy (no lookahead)</button>
+      <button class="btn" id="lim-mode-truepeak">True-peak (lookahead)</button>
+    </div>
+    <div class="vol-row" style="margin-top:8px">
+      <span class="icon">🎚️</span>
+      <input type="range" id="lim-thr" min="-24" max="0" value="-1" step="0.5">
+      <span class="pct" id="lim-thr-val">-1.0 dBFS</span>
+    </div>
+    <div class="hint" id="lim-hint"></div>
   </div>
 
   <!-- Volume ──────────────────────────────────────────── -->
-  <div class="section-title">Main volume</div>
+  <div class="section-title">Volume</div>
   <div class="vol-row">
     <span class="icon">🔈</span>
-    <input type="range" id="vol-slider" min="0" max="100" value="80" step="1">
+    <input type="range" id="vol-slider" min="-60" max="0" value="-12" step="1">
     <span class="icon">🔊</span>
     <span class="pct" id="vol-pct">80%</span>
+    <span class="db" id="vol-db">--</span>
   </div>
 
   <!-- System Status ───────────────────────────────────── -->
@@ -155,227 +274,1007 @@
     <span>Uptime <span id="sys-uptime">--</span></span>
   </div>
 
+  <!-- System actions ──────────────────────────────────── -->
+  <div class="sys-row">
+    <button class="sys-btn" id="btn-reboot">Reboot</button>
+    <span id="sys-note"></span>
+  </div>
+
 </div>
 
 <script>
+// ════════════════════════════════════════════════════════════════════════
+// Panel layout
+//
+//   wizard → effect cards → current chain → presets → limiter → volume/status
+//
+// Three rules run through the whole file:
+//
+// 1. The HARDWARE decides what is available. The page first reads
+//    /api/dsp/capabilities: the band limit, whether a true-peak limiter exists
+//    and which effect types are still planned all come from there. Nothing is
+//    hardcoded to "6 bands" or "both limiter modes exist" -- those change
+//    between bitstream generations.
+// 2. If it does not fit, say so. Going over the band limit is never silently
+//    truncated: the backend's own message is shown verbatim (it names which
+//    bands were dropped), and the UI only relays it.
+// 3. A card is not the chain. A card is a shortcut that adds its curve's bands
+//    to the current chain, and whether it looks "on" is DERIVED by matching the
+//    chain. The other way round (card state as the source of truth) would lie
+//    after applying a preset: the preset changes the chain while the cards
+//    still show the old state. The single source of truth is the current chain.
+// ════════════════════════════════════════════════════════════════════════
+
 // ── State ─────────────────────────────────────────────────────────────
 let state = {
-  source: 'idle', title:'', artist:'', album:'', playing:false, volume:80,
+  source: 'idle', title:'', artist:'', album:'', playing:false, volume:80, volume_db:-12,
   dsp:{ enabled:true, bypass:false, preset:'flat', bands:[] },
   system:{ cpu_percent:0, mem_used_mb:0, uptime_sec:0 }
 };
-// 6 bands: frequencies must be >=60Hz (stability limit of the Q3.15 coefficients at 48kHz, see backend/dsp.go)
-const BAND_FREQS = [60,150,400,1000,3000,10000];
-const freqLabels = ['60','150','400','1k','3k','10k'];
-const presetNames = ['flat','rock','jazz','classical','vocal','bass'];
+let caps = null;        // /api/dsp/capabilities (hardware self-description)
+let chain = [];         // current chain (the single source of truth, see rule 3)
+let presets = [];       // preset list (built-in + user)
+let cardCfg = {};       // per-card strength: {cardId:'light'|'mid'|'strong'}
+let wizard = { step:1, device:'small', goals:[], strength:'mid', generated:null };
+let abChain = null;     // A side of the A/B comparison (the chain before generating)
+let abSide = '';        // '' | 'A' | 'B'
 const API = '';
 
-// ── DOM refs ──────────────────────────────────────────────────────────
+// Strength step -> base gain in dB. Each band of a card scales this by its weight.
+const STRENGTH_DB = { light: 2, mid: 4, strong: 6 };
+const STRENGTH_LABEL = { light:'Light', mid:'Medium', strong:'Strong' };
+
+// Effect cards: five that the current engine can do, plus two planned ones (greyed).
+// bands[].g is the weight relative to the strength step: 1.0 = that step's base dB.
+const CARDS = [
+  { id:'bass',    name:'Deep bass',    desc:'Hear the low end even at low volume', stage:'P0',
+    bands:[{freq:60,q:0.7,g:1.0},{freq:150,q:0.8,g:0.7}] },
+  { id:'vocal',   name:'Clear vocals', desc:'Voices and dialogue step out of the mix', stage:'P0',
+    bands:[{freq:400,q:0.8,g:-0.5},{freq:1000,q:1.0,g:0.9},{freq:3000,q:1.0,g:1.0}] },
+  { id:'vocalhd', name:'Detailed vocals', desc:'Brighter lead voices', stage:'P0',
+    bands:[{freq:400,q:0.8,g:-0.5},{freq:1000,q:1.0,g:0.8},{freq:3000,q:1.2,g:1.0},
+           {freq:6000,q:1.0,g:0.6}] },
+  { id:'soft',    name:'Easy listening', desc:'Tame harsh treble, comfortable for hours', stage:'P0',
+    bands:[{freq:3000,q:1.0,g:-0.7},{freq:10000,q:0.8,g:-1.0}] },
+  { id:'night',   name:'Late-night',   desc:'Stay intelligible at low volume', stage:'P0',
+    bands:[{freq:60,q:0.7,g:0.8},{freq:150,q:0.8,g:0.6},{freq:3000,q:1.0,g:-0.3},
+           {freq:10000,q:0.8,g:0.5}] },
+  // Planned: the reason text for `requires` comes from the backend's
+  // capabilities.planned map and is shown as-is.
+  { id:'spatial', name:'3D / headphone stage', desc:'Move the image from inside your head to in front',
+    stage:'P2', requires:['crossfeed'] },
+  { id:'widener', name:'Stereo widening', desc:'Wider, more enveloping image',
+    stage:'P2', requires:['widener'] },
+];
+
+// Wizard step 2: what would you like to improve (multi-select, up to 3).
+const GOALS = [
+  { id:'bass',   label:'More bass',      bands:[{freq:60,q:0.7,g:1.0},{freq:150,q:0.8,g:0.7}] },
+  { id:'muddy',  label:'Bass too muddy', bands:[{freq:150,q:1.0,g:-0.6},{freq:400,q:1.0,g:-0.8}] },
+  { id:'vocal',  label:'Unclear vocals', bands:[{freq:400,q:0.8,g:-0.5},{freq:1000,q:1.0,g:0.9},
+                                          {freq:3000,q:1.0,g:1.0}] },
+  { id:'harsh',  label:'Harsh treble',   bands:[{freq:3000,q:1.0,g:-0.7},{freq:10000,q:0.8,g:-1.0}] },
+  { id:'dull',   label:'Dull treble',    bands:[{freq:6000,q:1.0,g:0.8},{freq:10000,q:0.8,g:1.0}] },
+  { id:'quiet',  label:'Quiet listening', bands:[{freq:60,q:0.7,g:0.8},{freq:150,q:0.8,g:0.6},
+                                          {freq:3000,q:1.0,g:-0.3},{freq:10000,q:0.8,g:0.5}] },
+  { id:'warm',   label:'Warmer sound',   bands:[{freq:200,q:0.8,g:0.7},{freq:3000,q:1.0,g:-0.5}] },
+];
+// Wizard step 1: headphones need more low-end compensation than speakers.
+const DEVICES = [
+  { id:'headphone', label:'Headphones',  scale:0.8, hint:'In-ear / over-ear' },
+  { id:'small',     label:'Small speakers', scale:1.0, hint:'Desktop / Bluetooth' },
+  { id:'big',       label:'Big speakers / amp', scale:1.2, hint:'Living room / floor-standing' },
+];
+
+// Default frequencies for "add a band"; the real limit is caps.bands.
+const DEFAULT_FREQS = [60,150,400,1000,3000,10000];
+
+// ── DOM helpers ───────────────────────────────────────────────────────
 function $(id){ return document.getElementById(id) }
 function setText(id,t){ const e=$(id); if(e)e.textContent=t }
-
-// ── Fetch status ──────────────────────────────────────────────────────
-async function fetchStatus(){
-  try {
-    const r = await fetch(API+'/api/status');
-    if(!r.ok) return;
-    state = await r.json();
-    render();
-  } catch(e){}
+function el(tag, cls, text){
+  const e = document.createElement(tag);
+  if(cls) e.className = cls;
+  if(text !== undefined && text !== null) e.textContent = text;
+  return e;
 }
+// Source display names plus a hint on how to start that source.
+// Do NOT say "connected": the backend only knows which source is SELECTED, not
+// whether a phone has actually connected (only state.playing means audio is
+// flowing -- see systemIsPlaying in the backend). The subtitle used to claim
+// "airplay connected" from the selection alone, while the title claimed
+// "No source connected" whenever nothing was playing: the two contradicted.
+const SRC_LABEL = { airplay:'AirPlay', bluetooth:'Bluetooth', dlna:'DLNA' };
+const SRC_HINT = {
+  airplay:   'Cast to ZYBO Audio from your phone',
+  bluetooth: 'Pair ZYBO Audio from your phone',
+  dlna:      'Waiting for a push',
+};
 
-// ── Connect WebSocket ─────────────────────────────────────────────────
-function connectWS(){
-  const proto = location.protocol==='https:'?'wss':'ws';
-  const ws = new WebSocket(proto+'://'+location.host+'/ws');
-  ws.onmessage = function(ev){
-    try {
-      state = JSON.parse(ev.data);
-      render();
-    } catch(e){}
-  };
-  ws.onclose = function(){ setTimeout(connectWS,2000) };
-}
-
-// ── Render ────────────────────────────────────────────────────────────
-function render(){
-  // now-playing
-  setText('np-title', state.title || (state.playing ? 'Playing...' : 'No source connected'));
-  setText('np-artist', state.artist ? state.artist+(state.album?' — '+state.album:'') :
-    (state.source==='idle'?'Select a source to start playing':state.source+' connected'));
-  $('source-badge').textContent = state.source==='idle' ? 'Idle' :
-    state.source==='airplay' ? 'AirPlay' : state.source==='dlna' ? 'DLNA' : 'Bluetooth';
-  $('source-badge').style.background = state.source==='idle'?'#25253e':'#2a2a4e';
-
-  // source buttons
-  ['idle','airplay','dlna','bluetooth'].forEach(function(s){
-    const el = $('src-'+s);
-    if(!el) return;
-    el.classList.toggle('active', state.source===s);
-    // Sources not packaged in this image are hidden entirely (a greyed-out button with a tooltip still looks clickable)
-    const avail = (s==='idle') || !state.sources || state.sources[s] !== false;
-    el.disabled = !avail;
-    el.style.display = avail ? '' : 'none';
-    el.title = avail ? '' : 'Source not installed in this image';
-  });
-
-  // volume
-  const vs = $('vol-slider');
-  if(vs && document.activeElement !== vs) vs.value = state.volume;
-  setText('vol-pct', state.volume+'%');
-
-  // EQ sliders
-  renderEQ();
-
-  // Version (a release reports its identity, making it easy to match against an image)
-  setText('app-ver', state.version ? 'v'+state.version : '');
-
-  // system
-  setText('sys-cpu', state.system.cpu_percent);
-  setText('sys-ram', state.system.mem_used_mb);
-  setText('sys-uptime', fmtUptime(state.system.uptime_sec));
-}
-
-// ── EQ Render ─────────────────────────────────────────────────────────
-function buildEQ(){
-  const container = $('eq-sliders');
-  container.innerHTML = '';
-  for(let i=0;i<6;i++){
-    const col = document.createElement('div');
-    col.className = 'eq-col';
-    col.innerHTML =
-      '<div class="track"><input type="range" min="-12" max="12" value="0" step="0.5" data-band="'+i+'"></div>'+
-      '<div class="val">0dB</div><div class="lbl">'+freqLabels[i]+'</div>';
-    container.appendChild(col);
+// ── Notice bar (the only error outlet) ────────────────────────────────
+let noticeTimer = null;
+function showNotice(msg, kind, details){
+  const n = $('notice');
+  if(!n) return;
+  n.hidden = false;
+  n.className = 'notice' + (kind && kind !== 'err' ? ' '+kind : '');
+  n.innerHTML = '';
+  n.appendChild(el('div','nt-h', msg));
+  if(details && details.length){
+    const ul = el('ul');
+    details.forEach(function(d){ ul.appendChild(el('li', null, d)) });
+    n.appendChild(ul);
   }
-  // add input handlers
-  container.querySelectorAll('input').forEach(function(inp){
-    inp.addEventListener('input', function(){
-      const band = +this.dataset.band;
-      const dB = parseFloat(this.value);
-      this.closest('.eq-col').querySelector('.val').textContent =
-        (dB>=0?'+':'')+dB.toFixed(1)+'dB';
-      debounceEQ(band, dB);
+  if(noticeTimer) clearTimeout(noticeTimer);
+  // Success notices fade out on their own; errors stay until they are read.
+  if(kind === 'ok') noticeTimer = setTimeout(clearNotice, 4000);
+}
+function clearNotice(){ const n = $('notice'); if(n){ n.hidden = true; n.innerHTML = '' } }
+function fmtDB(db, pct){
+  if(pct <= 0) return 'Muted';
+  return (db > 0 ? '+' : '') + db.toFixed(0) + ' dB';
+}
+
+// ── HTTP: surface the backend's own message (errors are {"error": "..."}) ──
+async function api(path, opts){
+  const r = await fetch(API + path, opts);
+  const text = await r.text();
+  let body = null;
+  try { body = text ? JSON.parse(text) : null } catch(e){}
+  if(!r.ok){
+    const msg = (body && body.error) ? body.error : ('HTTP ' + r.status);
+    const err = new Error(msg);
+    err.status = r.status;
+    err.body = body;
+    throw err;
+  }
+  return body;
+}
+function postJSON(path, obj, method){
+  return api(path, {
+    method: method || 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(obj)
+  });
+}
+
+// ── Capabilities → UI ─────────────────────────────────────────────────
+function maxBands(){
+  // Band limit: the chain model is capped (6 bands), while the engine's own
+  // storage is larger. The backend reports `bands` honestly and the UI only
+  // uses that number instead of hardcoding one.
+  return (caps && caps.bands) ? caps.bands : 6;
+}
+function truepeakAvailable(){
+  return !!(caps && caps.limiter && caps.limiter.truepeak_available);
+}
+function plannedReason(requires){
+  if(!requires || !caps || !caps.planned) return '';
+  const out = [];
+  requires.forEach(function(t){
+    const why = caps.planned[t];
+    if(why) out.push(why);
+  });
+  return out.join('; ');
+}
+function renderEngineLine(){
+  const line = $('engine-line');
+  if(!line) return;
+  if(!caps){ line.textContent = 'Reading engine capabilities…'; return }
+  const parts = [];
+  parts.push(caps.engine === 'slot-table' ? 'slot-table engine' : 'fixed 6-band');
+  parts.push('up to ' + caps.bands + ' bands');
+  parts.push(truepeakAvailable() ? 'true-peak limiter available' : 'no true-peak limiter');
+  if(caps.dsp_available === false) parts.push('DSP unavailable');
+  line.innerHTML = '';
+  line.appendChild(el('b', null, 'Engine: '));
+  line.appendChild(document.createTextNode(parts.join(' · ')));
+}
+
+async function loadCaps(){
+  try {
+    caps = await api('/api/dsp/capabilities');
+  } catch(e){
+    caps = null;
+    showNotice('Cannot read engine capabilities (/api/dsp/capabilities): ' + e.message);
+  }
+  renderEngineLine();
+}
+
+// ── Current chain ─────────────────────────────────────────────────────
+// The input ranges below match the backend's own clamping
+// (60 Hz / 0.1 Q / +/-24 dB / 20 kHz). The backend sanitizes silently, so if
+// the UI allowed 20 Hz the display would say 20 while the hardware ran 60.
+const FREQ_MIN = 60, FREQ_MAX = 20000, GAIN_LIM = 24, Q_MIN = 0.1, Q_MAX = 10;
+
+function chainInputFocused(){
+  const a = document.activeElement;
+  return !!(a && a.closest && a.closest('#chain-list'));
+}
+function cardsInputFocused(){
+  const a = document.activeElement;
+  return !!(a && a.closest && a.closest('#cards'));
+}
+
+async function loadChain(force){
+  try {
+    const d = await api('/api/dsp/chain');
+    chain = (d.chain || []).map(function(it){
+      return { type: it.type || 'peq', enabled: it.enabled !== false,
+               freq: +it.freq || 1000, gain_db: +it.gain_db || 0, q: +it.q || 1 };
+    });
+    // Do not interrupt someone who is typing: never rebuild the whole DOM
+    // underneath an input that currently has focus.
+    if(force || !chainInputFocused()) renderChain();
+    if(force || !cardsInputFocused()) renderCards();
+    renderPresets();   // the preset highlight is derived from the chain
+  } catch(e){
+    showNotice('Cannot read the current chain: ' + e.message);
+  }
+}
+
+let chainTimer = null;
+function pushChain(){
+  if(chainTimer) clearTimeout(chainTimer);
+  chainTimer = setTimeout(function(){ applyChainNow() }, 150);
+}
+async function applyChainNow(){
+  const items = chain
+    .filter(function(it){ return it.enabled !== false })
+    .map(function(it){
+      return { type: it.type || 'peq', enabled: true,
+               freq: +it.freq, gain_db: +it.gain_db, q: +it.q };
+    });
+  try {
+    const d = await postJSON('/api/dsp/chain', { chain: items }, 'PUT');
+    renderPresets();   // highlight is derived: once the chain changes it follows
+    if(d && typeof d.preamp_db === 'number' && d.preamp_db < -0.05){
+      // The backend applied this headroom itself to avoid clipping; say so,
+      // the user is entitled to know.
+      showNotice('Applied (' + d.applied + ' bands). Overall level reduced by ' +
+                 Math.abs(d.preamp_db).toFixed(1) + ' dB to avoid clipping', 'ok');
+    }
+    // Read back once: the backend clamps out-of-range values (see FREQ_MIN
+    // above), and this shows what actually took effect.
+    if(!chainInputFocused()) await loadChain();
+  } catch(e){
+    // Does not fit / unsupported band: show the backend's own message rather
+    // than truncating silently.
+    showNotice('This chain was not applied', 'err', [e.message]);
+  }
+}
+
+// ── Effect cards ──────────────────────────────────────────────────────
+// A card looks "on" when every one of its bands is present in the current
+// chain (matched by frequency, 5% tolerance).
+function cardMatches(card){
+  if(!card.bands) return [];
+  const hits = [];
+  card.bands.forEach(function(b){
+    const tol = Math.max(3, b.freq * 0.05);
+    const found = chain.find(function(it){
+      return it.enabled !== false && Math.abs(it.freq - b.freq) <= tol;
+    });
+    hits.push(found || null);
+  });
+  return hits;
+}
+function cardOn(card){
+  const hits = cardMatches(card);
+  return hits.length > 0 && hits.every(function(h){ return !!h });
+}
+function cardStrengthNow(card){
+  // Derive the strength step from the gains actually in the chain. A card does
+  // not remember "which step I think I am", otherwise it would report a step
+  // unrelated to the chain after a preset was applied.
+  const hits = cardMatches(card);
+  const base = card.bands.filter(function(b){ return b.g > 0 });
+  if(!base.length) return cardCfg[card.id] || 'mid';
+  const b0 = base[0];
+  const h = hits[card.bands.indexOf(b0)];
+  if(!h) return cardCfg[card.id] || 'mid';
+  const db = h.gain_db / b0.g;
+  let best = 'mid', bestDiff = 99;
+  Object.keys(STRENGTH_DB).forEach(function(k){
+    const diff = Math.abs(STRENGTH_DB[k] - db);
+    if(diff < bestDiff){ bestDiff = diff; best = k }
+  });
+  return best;
+}
+function renderCards(){
+  const box = $('cards');
+  if(!box) return;
+  box.innerHTML = '';
+  CARDS.forEach(function(card){
+    const grey = !!card.requires;
+    const on = cardOn(card);
+    const div = el('div', 'fx-card' + (on ? ' on' : '') + (grey ? ' grey' : ''));
+    div.dataset.card = card.id;
+
+    const head = el('div','fx-head');
+    const main = el('div','fx-main');
+    const nm = el('div','fx-name');
+    nm.appendChild(document.createTextNode(card.name));
+    nm.appendChild(el('span','fx-tag', card.stage));
+    main.appendChild(nm);
+    main.appendChild(el('div','fx-desc', card.desc));
+    if(grey){
+      const why = plannedReason(card.requires);
+      main.appendChild(el('div','fx-why', why || 'Not supported by this engine yet'));
+    }
+    // Tapping the body expands/collapses the parameters; it does not change the
+    // chain (avoids accidental edits).
+    main.addEventListener('click', function(){
+      if(grey) return;
+      div.classList.toggle('open');
+      renderCards();
+    });
+    head.appendChild(main);
+
+    const sw = el('button','fx-sw' + (on ? ' on' : ''));
+    sw.setAttribute('aria-label', card.name);
+    if(grey) sw.disabled = true;
+    sw.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      if(grey) return;
+      toggleCard(card);
+    });
+    head.appendChild(sw);
+    div.appendChild(head);
+
+    if(div.classList.contains('open') && !grey){
+      const cfg = el('div','fx-cfg');
+      const st = el('div','strength');
+      st.appendChild(el('span','lb','Strength'));
+      ['light','mid','strong'].forEach(function(k){
+        const b = el('button','btn sm' + (cardStrengthNow(card) === k ? ' active' : ''),
+                     STRENGTH_LABEL[k]);
+        b.dataset.strength = k;
+        b.addEventListener('click', function(){ setCardStrength(card, k) });
+        st.appendChild(b);
+      });
+      cfg.appendChild(st);
+      if(on){
+        // While enabled these three bands ARE the three in the chain, so edit
+        // them directly (and push the change).
+        const hits = cardMatches(card);
+        card.bands.forEach(function(b, i){
+          if(!hits[i]) return;
+          const target = hits[i];
+          const row = paramRow(function(v){
+            if(isFinite(v.freq) && v.freq > 0) target.freq = v.freq;
+            if(isFinite(v.gain_db)) target.gain_db = v.gain_db;
+            if(isFinite(v.q) && v.q > 0) target.q = v.q;
+            renderChainMeta();
+            pushChain();
+          }, target, false);
+          cfg.appendChild(row);
+        });
+      } else {
+        cfg.appendChild(el('div','hint',
+          'Currently off. Turning it on adds these bands to the current chain, and then each band can be edited.'));
+      }
+      div.appendChild(cfg);
+    }
+    box.appendChild(div);
+  });
+  renderChainMeta();
+}
+
+function toggleCard(card){
+  const hits = cardMatches(card);
+  const on = hits.length > 0 && hits.every(function(h){ return !!h });
+  if(on){
+    // Turning off removes the bands this card occupies (matched by frequency).
+    chain = chain.filter(function(it){
+      return !card.bands.some(function(b){
+        return Math.abs(it.freq - b.freq) <= Math.max(3, b.freq * 0.05);
+      });
+    });
+  } else {
+    const strength = cardCfg[card.id] || cardStrengthNow(card) || 'mid';
+    card.bands.forEach(function(b){
+      const exists = chain.some(function(it){
+        return Math.abs(it.freq - b.freq) <= Math.max(3, b.freq * 0.05);
+      });
+      if(!exists){
+        chain.push({ type:'peq', enabled:true, freq:b.freq,
+                     gain_db:+(STRENGTH_DB[strength] * b.g).toFixed(1), q:b.q });
+      }
+    });
+    chain.sort(function(a,b){ return a.freq - b.freq });
+  }
+  cardCfg[card.id] = cardCfg[card.id] || 'mid';
+  renderChain();
+  renderCards();
+  pushChain();
+}
+
+function setCardStrength(card, k){
+  cardCfg[card.id] = k;
+  // Changing the strength changes those bands' gains in the chain -- the card
+  // does not keep a separate copy of "its" parameters, which would drift.
+  card.bands.forEach(function(b){
+    const tol = Math.max(3, b.freq * 0.05);
+    chain.forEach(function(it){
+      if(Math.abs(it.freq - b.freq) <= tol){
+        it.gain_db = +(STRENGTH_DB[k] * b.g).toFixed(1);
+        it.q = b.q;
+      }
     });
   });
+  renderChain();
+  renderCards();
+  pushChain();
 }
 
-let eqTimer = null;
-function debounceEQ(band, dB){
-  if(eqTimer) clearTimeout(eqTimer);
-  eqTimer = setTimeout(function(){
-    const freq = BAND_FREQS[band];
-    const q = 0.7;
-    fetch(API+'/api/dsp/eq/'+band, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({gain_db:dB, freq:freq, q:q})
-    }).catch(function(){});
-  }, 100);
+// ── Chain editor ──────────────────────────────────────────────────────
+// paramRow is the freq/gain/Q triple; the expanded card and the chain editor
+// share it. readOnly is for showing a template value that is not live yet.
+function paramRow(onChange, vals, readOnly){
+  const row = el('div','param-row');
+  function num(cls, value, step, min, max, label){
+    const i = document.createElement('input');
+    i.type = 'number';
+    i.className = cls;
+    i.value = value;
+    i.step = step; i.min = min; i.max = max;
+    i.setAttribute('aria-label', label);
+    if(readOnly) i.readOnly = true;
+    return i;
+  }
+  const f = num('pf', vals.freq, 1, FREQ_MIN, FREQ_MAX, 'Frequency');
+  const g = num('pg', vals.gain_db, 0.5, -GAIN_LIM, GAIN_LIM, 'Gain');
+  const q = num('pq', vals.q, 0.1, Q_MIN, Q_MAX, 'Q');
+  row.appendChild(f);
+  row.appendChild(el('span','unit','Hz'));
+  row.appendChild(g);
+  row.appendChild(el('span','unit','dB'));
+  row.appendChild(q);
+  row.appendChild(el('span','unit','Q'));
+  if(!readOnly && onChange){
+    [f,g,q].forEach(function(inp){
+      inp.addEventListener('input', function(){
+        // Read all three boxes together so a half-typed value never reaches
+        // the hardware.
+        onChange({
+          freq: parseFloat(f.value),
+          gain_db: parseFloat(g.value),
+          q: parseFloat(q.value),
+        });
+      });
+    });
+  }
+  return row;
 }
 
-function renderEQ(){
-  const sliders = document.querySelectorAll('#eq-sliders input');
-  sliders.forEach(function(inp){
-    const band = +inp.dataset.band;
-    if(state.dsp.bands && state.dsp.bands[band] && document.activeElement !== inp){
-      inp.value = state.dsp.bands[band].gain_db;
-      inp.closest('.eq-col').querySelector('.val').textContent =
-        (state.dsp.bands[band].gain_db>=0?'+':'')+state.dsp.bands[band].gain_db.toFixed(1)+'dB';
-    }
+function renderChainMeta(){
+  const m = $('chain-meta');
+  if(!m) return;
+  const n = chain.filter(function(it){ return it.enabled !== false }).length;
+  const lim = maxBands();
+  m.textContent = 'Using ' + n + ' / ' + lim + ' bands';
+  m.className = 'chain-meta' + (n > lim ? ' over' : '');
+  if(n > lim) m.textContent += ' (over the limit, applying will be rejected)';
+}
+
+function renderChain(){
+  const box = $('chain-list');
+  if(!box) return;
+  box.innerHTML = '';
+  if(!chain.length){
+    box.appendChild(el('div','hint','Flat (no effect bands)'));
+    renderChainMeta();
+    return;
+  }
+  chain.forEach(function(it, idx){
+    const row = el('div','chain-row');
+    const pr = paramRow(function(v){
+      if(isFinite(v.freq) && v.freq > 0) it.freq = v.freq;
+      if(isFinite(v.gain_db)) it.gain_db = v.gain_db;
+      if(isFinite(v.q) && v.q > 0) it.q = v.q;
+      renderChainMeta();
+      renderCards();
+      pushChain();
+    }, it, false);
+    row.appendChild(pr);
+    const rm = el('button','btn sm danger rm','✕');
+    rm.setAttribute('aria-label','Remove this band');
+    rm.addEventListener('click', function(){
+      chain.splice(idx, 1);
+      renderChain(); renderCards(); pushChain();
+    });
+    row.appendChild(rm);
+    box.appendChild(row);
   });
+  renderChainMeta();
 }
 
 // ── Presets ───────────────────────────────────────────────────────────
-function buildPresets(){
-  const container = $('presets');
-  const labels = { flat:'Flat', rock:'Rock', jazz:'Jazz',
-                   classical:'Classical', vocal:'Vocal', bass:'Bass' };
-  presetNames.forEach(function(name){
-    const btn = document.createElement('button');
-    btn.className = 'pst-btn';
-    btn.textContent = labels[name] || name;
-    btn.dataset.preset = name;
-    btn.addEventListener('click', function(){
-      fetch(API+'/api/dsp/preset', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({name:name})
-      }).catch(function(){});
-    });
-    container.appendChild(btn);
-  });
+async function loadPresets(){
+  try {
+    const d = await api('/api/dsp/presets');
+    presets = d.presets || [];
+    renderPresets();
+  } catch(e){
+    presets = [];
+    showNotice('Cannot read the preset list: ' + e.message);
+  }
+  const hint = $('preset-hint');
+  if(hint){
+    const nb = caps && caps.presets ? caps.presets.builtin : null;
+    hint.textContent = (nb === 0 || nb === null)
+      ? 'No built-in library installed (/usr/share/zybo-audio/presets/library.json missing) -- a packaging matter, not a broken UI'
+      : 'Built-in ' + caps.presets.builtin + ' + mine ' + (caps.presets.user || 0) + '; greyed ones need a newer engine';
+  }
 }
 
 function renderPresets(){
-  document.querySelectorAll('.pst-btn').forEach(function(btn){
-    btn.classList.toggle('active', btn.dataset.preset === state.dsp.preset);
-  });
+  const box = $('preset-list');
+  if(!box) return;
+  box.innerHTML = '';
+  const builtin = presets.filter(function(p){ return p.builtin });
+  const user = presets.filter(function(p){ return !p.builtin });
+  function group(title, list){
+    if(!list.length) return;
+    box.appendChild(el('div','pst-sec', title));
+    list.forEach(function(p){ box.appendChild(presetItem(p)) });
+  }
+  group('Built-in', builtin);
+  group('Mine', user);
+  if(!presets.length){
+    box.appendChild(el('div','hint','No presets available yet'));
+  }
 }
 
-// ── Source buttons ─────────────────────────────────────────────────────
-document.querySelectorAll('.src-btn').forEach(function(btn){
-  btn.addEventListener('click', function(){
-    const src = this.dataset.src;
-    if(src === state.source) return;
-    fetch(API+'/api/source/select', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({source:src})
-    }).catch(function(){});
-  });
-});
+// Which preset is in use is DERIVED by comparing the current chain, not
+// remembered from "which button was clicked": after applying a preset,
+// importing, editing one band or A/B switching, the chain can differ from the
+// button that was pressed. If nothing matches, the chain is simply custom.
+function sameChain(a, b){
+  const norm = function(list){
+    return (list || []).filter(function(it){ return it.enabled !== false })
+      .map(function(it){
+        return { freq:+it.freq, gain_db:+it.gain_db, q:+it.q };
+      })
+      .sort(function(x,y){ return x.freq - y.freq });
+  };
+  const x = norm(a), y = norm(b);
+  if(x.length !== y.length) return false;
+  for(let i=0;i<x.length;i++){
+    if(Math.abs(x[i].freq - y[i].freq) > 0.5) return false;
+    if(Math.abs(x[i].gain_db - y[i].gain_db) > 0.15) return false;
+    if(Math.abs(x[i].q - y[i].q) > 0.05) return false;
+  }
+  return true;
+}
+function currentPresetName(){
+  for(let i=0;i<presets.length;i++){
+    const p = presets[i];
+    if(p.usable && p.chain && sameChain(p.chain, chain)) return p.name;
+  }
+  return '';
+}
 
-// ── Volume slider ──────────────────────────────────────────────────────
-$('vol-slider').addEventListener('input', function(){
-  const vol = +this.value;
-  setText('vol-pct', vol+'%');
-  clearTimeout(this._timer);
-  this._timer = setTimeout(function(){
-    fetch(API+'/api/volume', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({volume:vol})
-    }).catch(function(){});
-  }, 150);
-});
+function presetItem(p){
+  const item = el('div','pst-item' + (!p.usable ? ' grey' : '') +
+                        (p.name === currentPresetName() ? ' active' : ''));
+  item.dataset.preset = p.name;
+  item.dataset.usable = p.usable ? '1' : '0';
+  const nm = el('div','nm', p.name);
+  nm.title = (p.why && p.why.length) ? p.why.join('; ')
+           : (p.note || (p.bands + ' bands'));
+  // A greyed preset is not clickable: the backend would answer 409 anyway, and
+  // the UI should not offer an action that is bound to fail.
+  if(p.usable){
+    nm.addEventListener('click', function(){ applyPreset(p.name) });
+  } else {
+    nm.addEventListener('click', function(){
+      showNotice('"' + p.name + '" is not usable yet', 'warn', p.why || ['needs a newer engine']);
+    });
+  }
+  item.appendChild(nm);
+  item.appendChild(el('div','mini', p.usable ? (p.bands + 'bd') : (p.stage || 'planned')));
+  const acts = el('div','acts');
+  const exp = el('button', null, '⤓');
+  exp.title = 'Export this preset';
+  exp.addEventListener('click', function(ev){
+    ev.stopPropagation();
+    exportPreset(p.name);
+  });
+  acts.appendChild(exp);
+  if(!p.builtin){
+    const ren = el('button', null, '✎');
+    ren.title = 'Rename';
+    ren.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      renamePreset(p.name);
+    });
+    acts.appendChild(ren);
+    const del = el('button', null, '✕');
+    del.title = 'Delete';
+    del.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      deletePreset(p.name);
+    });
+    acts.appendChild(del);
+  }
+  item.appendChild(acts);
+  return item;
+}
+
+async function applyPreset(name){
+  try {
+    const d = await postJSON('/api/dsp/presets/apply', { name: name });
+    const applied = d.name || name;
+    clearNotice();
+    if(typeof d.preamp_db === 'number' && d.preamp_db < -0.05){
+      showNotice('Applied "' + applied + '". Overall level reduced by ' +
+                 Math.abs(d.preamp_db).toFixed(1) + ' dB to avoid clipping', 'ok');
+    }
+    await loadChain(true);
+    renderPresets();
+  } catch(e){
+    // 409 = needs a newer engine (the backend explains why); 400 = does not fit
+    if(e.status === 409){
+      showNotice('This preset is not usable yet (engine too small)', 'warn', [e.message]);
+    } else {
+      showNotice('Could not apply the preset', 'err', [e.message]);
+    }
+  }
+}
+
+async function savePreset(){
+  const name = (window.prompt && window.prompt('Preset name?', 'My sound')) || '';
+  if(!name.trim()) return;
+  try {
+    await postJSON('/api/dsp/presets', { name: name.trim() });
+    showNotice('Saved as "' + name.trim() + '"', 'ok');
+    await loadPresets();
+  } catch(e){
+    showNotice('Save failed', 'err', [e.message]);
+  }
+}
+async function renamePreset(from){
+  const to = (window.prompt && window.prompt('New name?', from)) || '';
+  if(!to.trim() || to.trim() === from) return;
+  try {
+    await postJSON('/api/dsp/presets/rename', { from: from, to: to.trim() });
+    showNotice('Renamed to "' + to.trim() + '"', 'ok');
+    await loadPresets();
+  } catch(e){
+    showNotice('Rename failed', 'err', [e.message]);
+  }
+}
+async function deletePreset(name){
+  if(!(window.confirm && window.confirm('Delete preset "' + name + '"?'))) return;
+  try {
+    await postJSON('/api/dsp/presets/delete', { name: name });
+    showNotice('Deleted "' + name + '"', 'ok');
+    await loadPresets();
+  } catch(e){
+    showNotice('Delete failed', 'err', [e.message]);
+  }
+}
+function exportPreset(name){
+  const a = document.createElement('a');
+  a.href = API + '/api/dsp/presets/export?name=' + encodeURIComponent(name);
+  a.download = name + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// ── Import ────────────────────────────────────────────────────────────
+// The file content is sent as the request body to /api/dsp/presets/import
+// (the backend detects the format: custom JSON, REW text or EqualizerAPO).
+// The returned warnings must be shown -- "which lines were not applied" is the
+// single most important sentence in an import.
+async function importFile(file){
+  const text = await file.text();
+  const base = file.name.replace(/\.[^.]+$/, '');
+  try {
+    const d = await api('/api/dsp/presets/import?name=' + encodeURIComponent(base), {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: text,
+    });
+    const warns = (d.warnings || []).slice();
+    if(d.apply_error) warns.push('Saved as a preset, but not applied to the hardware: ' + d.apply_error);
+    if(warns.length){
+      showNotice('Import finished with ' + warns.length + ' thing(s) to report', 'warn', warns);
+    } else {
+      showNotice('Import finished' + (d.preset ? ': ' + d.preset.name : ''), 'ok');
+    }
+    await loadPresets();
+    if(d.applied) await loadChain(true);
+  } catch(e){
+    // The backend's message already carries its own context; do not wrap it again.
+    showNotice(e.message, 'err', []);
+  }
+}
 
 // ── Limiter ───────────────────────────────────────────────────────────
-function pushLimiter(body){
-  fetch(API+'/api/dsp/limiter', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify(body)
-  }).catch(function(){});
-}
-
-$('lim-toggle').addEventListener('click', function(){
-  const cur = !!(state.dsp && state.dsp.limiter);
-  pushLimiter({ enabled: !cur });
-});
-
-$('lim-thr').addEventListener('input', function(){
-  const v = parseFloat(this.value);
-  setText('lim-thr-val', v.toFixed(1)+' dBFS');
-  clearTimeout(this._timer);
-  this._timer = setTimeout(function(){ pushLimiter({ thr_db: v }); }, 150);
-});
-
 function renderLimiter(){
   const d = state.dsp || {};
+  const on = !!d.limiter;
   const btn = $('lim-toggle');
   if(btn){
-    btn.textContent = d.limiter ? 'Limiter on' : 'Limiter off';
-    btn.classList.toggle('active', !!d.limiter);
+    btn.textContent = on ? 'Limiter on' : 'Limiter off';
+    btn.classList.toggle('active', on);
+  }
+  const tp = truepeakAvailable();
+  const fbBtn = $('lim-mode-feedback'), tpBtn = $('lim-mode-truepeak');
+  const mode = d.limiter_mode || (caps && caps.limiter && caps.limiter.mode) || 'feedback';
+  if(fbBtn){
+    fbBtn.classList.toggle('active', mode !== 'truepeak');
+    fbBtn.disabled = false;
+  }
+  if(tpBtn){
+    tpBtn.classList.toggle('active', mode === 'truepeak');
+    // If the hardware has no true-peak mode, do not let it be clicked: on a
+    // bitstream without it, clicking would do nothing at all.
+    tpBtn.disabled = !tp;
+    tpBtn.title = tp ? '' : 'This bitstream has no true-peak limiter';
   }
   const thr = $('lim-thr');
   if(thr && document.activeElement !== thr && typeof d.lim_thr_db === 'number'){
     thr.value = d.lim_thr_db;
-    setText('lim-thr-val', d.lim_thr_db.toFixed(1)+' dBFS');
+    setText('lim-thr-val', (+d.lim_thr_db).toFixed(1) + ' dBFS');
+  }
+  const hint = $('lim-hint');
+  if(hint){
+    const L = (caps && caps.limiter) || {};
+    if(!on){
+      hint.textContent = 'Limiter is off: nothing prevents clipping, so 0 dBFS material can clip.';
+    } else if(mode === 'truepeak'){
+      hint.textContent = 'True-peak: 2 ms lookahead plus log-domain smoothing, bit-transparent below threshold.' +
+        (typeof L.att_ms === 'number'
+          ? ' Actual time constants ' + L.att_ms.toFixed(2) + ' ms / ' + L.rel_ms.toFixed(0) +
+            ' ms (max ' + L.rel_ms_max + ' ms)'
+          : '');
+    } else {
+      hint.textContent = 'Legacy: no lookahead, so 0 dBFS material shows waveform discontinuities (thousands per second).';
+    }
+  }
+}
+function pushLimiter(body){
+  return postJSON('/api/dsp/limiter', body).catch(function(e){
+    showNotice('Limiter setting failed', 'err', [e.message]);
+  });
+}
+
+// ── Wizard ────────────────────────────────────────────────────────────
+function renderWizard(){
+  const dots = $('wiz-dots'), q = $('wiz-q'), opts = $('wiz-opts'), acts = $('wiz-actions');
+  if(!dots) return;
+  dots.innerHTML = ''; opts.innerHTML = ''; acts.innerHTML = '';
+  [1,2,3,4].forEach(function(i){
+    const d = el('div','wiz-dot' + (wizard.step === i ? ' active' : '') +
+                          (wizard.step > i ? ' done' : ''), String(i));
+    d.dataset.step = String(i);
+    d.addEventListener('click', function(){ wizard.step = i; renderWizard() });
+    dots.appendChild(d);
+  });
+
+  function optBtn(label, active, fn, hint){
+    const b = el('button','btn' + (active ? ' active' : ''), label);
+    if(hint) b.title = hint;
+    b.dataset.opt = label;
+    b.addEventListener('click', fn);
+    opts.appendChild(b);
+    return b;
+  }
+
+  if(wizard.step === 1){
+    q.textContent = '1. What do you listen on?';
+    DEVICES.forEach(function(dv){
+      optBtn(dv.label, wizard.device === dv.id, function(){
+        wizard.device = dv.id; renderWizard();
+      }, dv.hint);
+    });
+  } else if(wizard.step === 2){
+    q.textContent = '2. What would you like to improve? (up to 3, ' + wizard.goals.length + ' selected)';
+    GOALS.forEach(function(g){
+      optBtn(g.label, wizard.goals.indexOf(g.id) >= 0, function(){
+        const i = wizard.goals.indexOf(g.id);
+        if(i >= 0) wizard.goals.splice(i, 1);
+        else if(wizard.goals.length < 3) wizard.goals.push(g.id);
+        else showNotice('At most 3 items', 'warn', ['Picking too many produces an "I want everything" curve, which usually sounds worse']);
+        renderWizard();
+      });
+    });
+  } else if(wizard.step === 3){
+    q.textContent = '3. How strong?';
+    ['light','mid','strong'].forEach(function(k){
+      optBtn(STRENGTH_LABEL[k], wizard.strength === k, function(){
+        wizard.strength = k; renderWizard();
+      }, STRENGTH_DB[k] + ' dB');
+    });
+  } else {
+    q.textContent = '4. Generate';
+    const b = el('button','btn primary','Generate and apply');
+    b.id = 'wiz-generate';
+    b.addEventListener('click', generateFromWizard);
+    acts.appendChild(b);
+  }
+
+  // Back / next
+  if(wizard.step < 4){
+    const next = el('button','btn primary','Next');
+    next.id = 'wiz-next';
+    next.addEventListener('click', function(){
+      if(wizard.step === 2 && !wizard.goals.length){
+        showNotice('Pick at least one thing to improve', 'warn', ['If you are not sure, use the effect cards or a preset below instead']);
+        return;
+      }
+      wizard.step = Math.min(4, wizard.step + 1);
+      renderWizard();
+    });
+    acts.appendChild(next);
+  }
+  const prev = el('button','btn','Back');
+  prev.id = 'wiz-prev';
+  prev.disabled = wizard.step === 1;
+  prev.addEventListener('click', function(){ wizard.step = Math.max(1, wizard.step-1); renderWizard() });
+  acts.insertBefore(prev, acts.firstChild);
+
+  renderWizardOut();
+}
+
+function wizBands(){
+  const dev = DEVICES.find(function(d){ return d.id === wizard.device }) || DEVICES[1];
+  const base = STRENGTH_DB[wizard.strength];
+  const out = [];
+  wizard.goals.forEach(function(id){
+    const g = GOALS.find(function(x){ return x.id === id });
+    if(!g) return;
+    g.bands.forEach(function(b){
+      out.push({ freq:b.freq, q:b.q, gain_db: b.g * base * dev.scale });
+    });
+  });
+  // Merge bands at the same frequency (within 20%): keep the larger magnitude,
+  // and the Q of the first one seen.
+  const merged = [];
+  out.forEach(function(b){
+    const hit = merged.find(function(m){ return Math.abs(m.freq - b.freq) <= m.freq * 0.2 });
+    if(hit){
+      if(Math.abs(b.gain_db) > Math.abs(hit.gain_db)) hit.gain_db = b.gain_db;
+    } else {
+      merged.push({ freq:b.freq, q:b.q, gain_db:b.gain_db });
+    }
+  });
+  merged.sort(function(a,b){ return a.freq - b.freq });
+  return merged.map(function(b){
+    return { type:'peq', enabled:true, freq:b.freq, q:b.q,
+             gain_db:+Math.max(-24, Math.min(24, b.gain_db)).toFixed(1) };
+  });
+}
+
+async function generateFromWizard(){
+  const items = wizBands();
+  const lim = maxBands();
+  if(items.length > lim){
+    // No truncation: say how many bands were produced and which ones, so the
+    // user can drop an item.
+    showNotice('The generated curve needs ' + items.length + ' bands, but this device has ' + lim + ' bands',
+      'err', ['Drop one item, or remove one of two similar choices: ' +
+              items.map(function(i){ return Math.round(i.freq) + 'Hz' }).join(', ')]);
+    return;
+  }
+  abChain = chain.map(function(it){ return Object.assign({}, it) });
+  try {
+    const d = await postJSON('/api/dsp/chain', { chain: items }, 'PUT');
+    abSide = 'B';
+    wizard.generated = items;
+    await loadChain(true);
+    clearNotice();
+    let msg = 'Generated ' + items.length + ' bands';
+    if(typeof d.preamp_db === 'number' && d.preamp_db < -0.05){
+      msg += '; reduced by ' + Math.abs(d.preamp_db).toFixed(1) + ' dB to avoid clipping';
+    }
+    showNotice(msg, 'ok');
+    renderWizardOut();
+  } catch(e){
+    showNotice('Generate failed', 'err', [e.message]);
   }
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────
+function renderWizardOut(){
+  const out = $('wiz-out');
+  if(!out) return;
+  out.innerHTML = '';
+  if(wizard.step < 4 || !wizard.generated){
+    out.appendChild(el('div', null, 'The wizard only touches the bands related to your goal. After generating you can A/B it and save it as a preset.'));
+    return;
+  }
+  const items = wizard.generated;
+  out.appendChild(el('div', null, 'Result: ' +
+    items.map(function(i){ return Math.round(i.freq) + 'Hz ' +
+      (i.gain_db >= 0 ? '+' : '') + i.gain_db.toFixed(1) + 'dB' }).join(', ')));
+  const ab = el('div','ab');
+  const a = el('button','btn' + (abSide === 'A' ? ' active' : ''), 'Hear A (before)');
+  a.id = 'wiz-ab-a';
+  a.disabled = !abChain;
+  a.addEventListener('click', function(){ switchAB('A') });
+  const b = el('button','btn' + (abSide === 'B' ? ' active' : ''), 'Hear B (result)');
+  b.id = 'wiz-ab-b';
+  b.addEventListener('click', function(){ switchAB('B') });
+  const save = el('button','btn', 'Save as my preset');
+  save.id = 'wiz-save';
+  save.addEventListener('click', savePreset);
+  ab.appendChild(a); ab.appendChild(b); ab.appendChild(save);
+  out.appendChild(ab);
+}
+
+async function switchAB(side){
+  const target = side === 'A' ? abChain : wizard.generated;
+  if(!target) return;
+  try {
+    await postJSON('/api/dsp/chain', { chain: target }, 'PUT');
+    abSide = side;
+    await loadChain(true);
+    renderWizardOut();
+    showNotice('Listening to ' + side + (side === 'A' ? ' (before)' : ' (result)'), 'ok');
+  } catch(e){
+    showNotice('A/B switch failed', 'err', [e.message]);
+  }
+}
+
+// ── Status (WebSocket / polling) ──────────────────────────────────────
+async function fetchStatus(){
+  try {
+    const r = await fetch(API + '/api/status');
+    if(!r.ok) return;
+    state = await r.json();
+    renderStatus();
+  } catch(e){}
+}
+function connectWS(){
+  const proto = location.protocol==='https:'?'wss':'ws';
+  let ws;
+  try { ws = new WebSocket(proto+'://'+location.host+'/ws') } catch(e){ return }
+  ws.onmessage = function(ev){
+    try { state = JSON.parse(ev.data); renderStatus() } catch(e){}
+  };
+  ws.onclose = function(){ setTimeout(connectWS,2000) };
+}
+function renderStatus(){
+  // now-playing: the title says whether audio is flowing, the subtitle says
+  // what is playing / how to start it, and the badge says which source is
+  // selected -- three separate facts that no longer contradict each other.
+  setText('np-title', state.playing ? (state.title || 'Playing…') : 'Not playing');
+  setText('np-artist', state.artist ? state.artist+(state.album?' — '+state.album:'') :
+    state.source==='idle' ? 'No source selected' :
+    state.playing ? ((SRC_LABEL[state.source]||state.source)+' playing') :
+    (SRC_HINT[state.source]||'Waiting for playback'));
+  $('source-badge').textContent = state.source==='idle' ? 'Idle' :
+    (SRC_LABEL[state.source]||state.source);
+  $('source-badge').style.background = state.source==='idle'?'#25253e':'#2a2a4e';
+
+  ['idle','airplay','dlna','bluetooth'].forEach(function(s){
+    const e = $('src-'+s);
+    if(!e) return;
+    e.classList.toggle('active', state.source===s);
+    // Hide sources this image does not ship (a greyed button plus a tooltip
+    // still implies "clickable, just disabled").
+    const avail = (s==='idle') || !state.sources || state.sources[s] !== false;
+    e.disabled = !avail;
+    e.style.display = avail ? '' : 'none';
+    e.title = avail ? '' : 'This source is not installed in this image';
+  });
+
+  const vs = $('vol-slider');
+  if(vs && document.activeElement !== vs) vs.value = Math.round(-60 + state.volume*0.6);
+  setText('vol-pct', state.volume+'%');
+  setText('vol-db', fmtDB(state.volume_db, state.volume));
+
+  setText('app-ver', state.version ? 'v'+state.version : '');
+  setText('sys-cpu', state.system.cpu_percent);
+  setText('sys-ram', state.system.mem_used_mb);
+  setText('sys-uptime', fmtUptime(state.system.uptime_sec));
+  renderLimiter();
+}
 function fmtUptime(sec){
   if(!sec || sec<0) return '--';
   const h = Math.floor(sec/3600);
@@ -384,33 +1283,119 @@ function fmtUptime(sec){
   return m+'m';
 }
 
-// ── Override render to include presets ─────────────────────────────────
-const _origRender = render;
-render = function(){
-  _origRender();
-  renderPresets();
-  renderLimiter();
-};
-
-// ── Init ───────────────────────────────────────────────────────────────
-buildEQ();
-buildPresets();
-
-// Import/Export buttons
-$('btn-import').addEventListener('click', function(){ $('file-import').click(); });
-$('file-import').addEventListener('change', function(){
-  const file = this.files[0];
-  if(!file) return;
-  const form = new FormData();
-  form.append('config', file);
-  fetch(API+'/api/dsp/import', { method:'POST', body: form })
-    .then(r => r.json())
-    .then(d => { alert('Imported: '+d.preset+' ('+d.bands+' bands)'); fetchStatus(); })
-    .catch(e => alert('Import failed: '+e));
+// ── Event wiring ──────────────────────────────────────────────────────
+document.querySelectorAll('.src-btn').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    const src = this.dataset.src;
+    if(src === state.source) return;
+    postJSON('/api/source/select', {source:src}).catch(function(e){
+      showNotice('Could not switch source', 'err', [e.message]);
+    });
+  });
 });
 
-fetchStatus();
-connectWS();
+// The slider is calibrated in dB, not percent: the codec only has a 1 dB grid,
+// and squeezing 60 dB into 100 steps is 1.667% per step, which makes a
+// percentage slider disagree with the hardware ("set 62, reads 63"). The
+// backend's percentage scale is fixed at -60 dB..0 dB <-> 0%..100%, so this
+// conversion shares the backend's definition.
+$('vol-slider').addEventListener('input', function(){
+  const db = +this.value;                        // -60 = muted
+  const vol = Math.round((db+60)/0.6);           // percentage the backend expects
+  setText('vol-pct', vol+'%');
+  setText('vol-db', fmtDB(db, vol));             // dB is the hardware truth
+  clearTimeout(this._timer);
+  this._timer = setTimeout(function(){
+    postJSON('/api/volume', {volume:vol}).catch(function(){});
+  }, 150);
+});
+
+$('lim-toggle').addEventListener('click', function(){
+  pushLimiter({ enabled: !(state.dsp && state.dsp.limiter) });
+});
+$('lim-mode-feedback').addEventListener('click', function(){
+  pushLimiter({ mode: 'feedback' });
+});
+$('lim-mode-truepeak').addEventListener('click', function(){
+  if(!truepeakAvailable()){
+    showNotice('This bitstream has no true-peak limiter', 'warn',
+      ['Legacy bitstreams only carry the feedback limiter; this becomes clickable with a newer bitstream']);
+    return;
+  }
+  pushLimiter({ mode: 'truepeak' });
+});
+$('lim-thr').addEventListener('input', function(){
+  const v = parseFloat(this.value);
+  setText('lim-thr-val', v.toFixed(1)+' dBFS');
+  clearTimeout(this._timer);
+  this._timer = setTimeout(function(){ pushLimiter({ thr_db: v }) }, 150);
+});
+
+$('btn-add-band').addEventListener('click', function(){
+  const used = chain.length;
+  const freq = DEFAULT_FREQS[Math.min(used, DEFAULT_FREQS.length-1)];
+  chain.push({ type:'peq', enabled:true, freq:freq, gain_db:0, q:1.0 });
+  chain.sort(function(a,b){ return a.freq - b.freq });
+  renderChain(); renderCards(); pushChain();
+});
+$('btn-chain-clear').addEventListener('click', function(){
+  if(!chain.length) return;
+  if(!(window.confirm && window.confirm('Clear the current chain (back to flat)?'))) return;
+  chain = [];
+  renderChain(); renderCards(); pushChain();
+});
+
+$('btn-save-preset').addEventListener('click', savePreset);
+$('btn-import').addEventListener('click', function(){ $('file-import').click() });
+$('file-import').addEventListener('change', function(){
+  const f = this.files && this.files[0];
+  if(!f) return;
+  importFile(f);
+  this.value = '';   // allow importing the same file twice in a row
+});
+
+// ── Reboot ────────────────────────────────────────────────────────────
+// POST /api/reboot just runs `reboot` and reports no progress, so probe for
+// liveness here: reload the page automatically once the backend is back
+// (about 20-30 s), instead of asking the user to refresh.
+$('btn-reboot').addEventListener('click', function(){
+  if(!(window.confirm && window.confirm('Reboot ZYBO Audio?\n\nPlayback stops immediately and this page returns automatically in about 30 seconds.'))) return;
+  const btn = this;
+  btn.disabled = true;
+  btn.textContent = 'Rebooting…';
+  setText('sys-note', 'The device is rebooting; this page will refresh itself…');
+  fetch(API+'/api/reboot', { method:'POST' }).catch(function(){});
+  let tries = 0;
+  const timer = setInterval(function(){
+    tries++;
+    fetch(API+'/api/status').then(function(r){
+      if(r.ok){                       // the backend answered: it is back
+        clearInterval(timer);
+        setText('sys-note', 'Back online, refreshing…');
+        location.reload();
+      }
+    }).catch(function(){});           // being unreachable during a reboot is normal
+    if(tries >= 45){                  // ~90 s is enough waiting
+      clearInterval(timer);
+      setText('sys-note', 'Still not back; refresh manually or check the power');
+      btn.disabled = false;
+      btn.textContent = 'Reboot';
+    }
+  }, 2000);
+});
+
+// ── Init ──────────────────────────────────────────────────────────────
+// Order matters: read the capabilities first (band limit, true-peak
+// availability), then the chain and presets. The other way round would draw one
+// frame assuming "6 bands and both limiter modes", then correct itself --
+// which flickers for a user and makes tests judge an intermediate state.
+(async function init(){
+  await loadCaps();
+  await Promise.all([loadChain(), loadPresets()]);
+  renderWizard();
+  fetchStatus();
+  connectWS();
+})();
 </script>
 
 </body>
