@@ -38,7 +38,7 @@ cnt() { # cnt <description> <file> <key> <expected count>
 # Shared assertions for the release settings
 assert_release() { # assert_release <case name> <file>
     has "$1: interpolation=soxr"       "$2" '^[[:space:]]*interpolation[[:space:]]*=[[:space:]]*"soxr"[[:space:]]*;'
-    has "$1: buffer=0.4"               "$2" '^[[:space:]]*audio_backend_buffer_desired_length_in_seconds[[:space:]]*=[[:space:]]*0\.4[[:space:]]*;'
+    has "$1: buffer=1.0"               "$2" '^[[:space:]]*audio_backend_buffer_desired_length_in_seconds[[:space:]]*=[[:space:]]*1\.0[[:space:]]*;'
     has "$1: ignore_volume_control=yes" "$2" '^[[:space:]]*ignore_volume_control[[:space:]]*=[[:space:]]*"yes"[[:space:]]*;'
     has "$1: log_verbosity=0"          "$2" '^[[:space:]]*log_verbosity[[:space:]]*=[[:space:]]*0[[:space:]]*;'
     has "$1: statistics=no"            "$2" '^[[:space:]]*statistics[[:space:]]*=[[:space:]]*"no"[[:space:]]*;'

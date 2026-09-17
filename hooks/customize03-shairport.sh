@@ -24,11 +24,14 @@
 #      That CPU cost is accepted here; shairport falls back to the cheap
 #      interpolator by itself if the DAC queue drops below that threshold.
 #
-#   2. general.audio_backend_buffer_desired_length_in_seconds = 0.4
-#      The default 0.2 s is drained by WiFi jitter on this machine (roaming
-#      between BSSIDs of the same SSID), but the 1.0 s this used to be adds a
-#      full second to the play/pause delay on top of AirPlay's own 2 s. 0.4 s
-#      held a stable queue in testing and keeps the total delay near 2.4 s.
+#   2. general.audio_backend_buffer_desired_length_in_seconds = 1.0
+#      The 0.2 s default is drained by WiFi jitter on this machine. 0.4 s was
+#      tried to cut the play/pause delay, but with that little slack the ALSA
+#      output underran 10 times in 33 minutes (shairport logs "alsa: recovering
+#      from a previous underrun") and each recovery drops 0.07-0.13 s of audio,
+#      audible as a short pause or a click. 1.0 s keeps enough slack to ride out
+#      the jitter; the cost is about a second more play/pause delay on top of
+#      AirPlay's own 2 s. Do not shrink it again for latency.
 #
 #   3. general.ignore_volume_control = "yes"
 #      The board has one volume knob (the WebUI writes the codec's Master
@@ -73,10 +76,10 @@ general =
 	// ~22.35 ms per resample (just under shairport's own 30 ms threshold) and one
 	// thread spins at ~105% CPU -- accepted, it is the only setting that is clean.
 	interpolation = "soxr";
-	// Play/pause delay: AirPlay itself contributes 2 s. The 0.2s default underruns
-	// under WiFi jitter, but 1.0s added a full second of delay; 0.4s held a stable
-	// queue in testing.
-	audio_backend_buffer_desired_length_in_seconds = 0.4;
+	// WiFi jitter drains the 0.2 s default. 0.4 s was tried to shorten the
+	// play/pause delay, but it underran 10 times in 33 minutes on the board and
+	// every recovery drops 0.07-0.13 s of audio (an audible pause or click).
+	audio_backend_buffer_desired_length_in_seconds = 1.0;
 	// The board has exactly one volume knob: the WebUI writes the codec's ALSA
 	// "Master" control and every source plays at unity into it. If shairport applies
 	// the sender's volume in software instead, the phone's -20 dB lands on
@@ -113,7 +116,7 @@ BEGIN {
     wkey["general", 1] = "interpolation"
     wval["general", 1] = "\tinterpolation = \"soxr\"; // the drift correction must be a real resampler: \"basic\" (linear interpolation) is audible as continuous ticking"
     wkey["general", 2] = "audio_backend_buffer_desired_length_in_seconds"
-    wval["general", 2] = "\taudio_backend_buffer_desired_length_in_seconds = 0.4; // 0.2s underruns under WiFi jitter, 1.0s added a whole second to the play/pause delay; 0.4s was stable"
+    wval["general", 2] = "\taudio_backend_buffer_desired_length_in_seconds = 1.0; // 0.4 underran 10 times in 33 min under WiFi jitter, and each recovery drops 0.07-0.13 s of audio (audible pause/click); 1.0 keeps enough slack"
     wkey["general", 3] = "ignore_volume_control"
     wval["general", 3] = "\tignore_volume_control = \"yes\"; // one volume knob, on the board: a sender volume would land on the -96 dB software scale of shairport (~-64 dB) and make AirPlay inaudible"
     wkey["general", 4] = "volume_max_db"
@@ -211,8 +214,8 @@ fail() { echo "[hook] ERROR: shairport-sync config validation failed: $1" >&2; e
 
 grep -qE '^[[:space:]]*interpolation[[:space:]]*=[[:space:]]*"soxr"[[:space:]]*;' "$CONF" \
     || fail 'interpolation is not "soxr" (with "basic" the linear-interpolation drift correction is audible as ticking)'
-grep -qE '^[[:space:]]*audio_backend_buffer_desired_length_in_seconds[[:space:]]*=[[:space:]]*0\.4[[:space:]]*;' "$CONF" \
-    || fail 'audio_backend_buffer_desired_length_in_seconds is not 0.4'
+grep -qE '^[[:space:]]*audio_backend_buffer_desired_length_in_seconds[[:space:]]*=[[:space:]]*1\.0[[:space:]]*;' "$CONF" \
+    || fail 'audio_backend_buffer_desired_length_in_seconds is not 1.0'
 grep -qE '^[[:space:]]*ignore_volume_control[[:space:]]*=[[:space:]]*"yes"[[:space:]]*;' "$CONF" \
     || fail 'ignore_volume_control is not "yes" (the sender volume would make AirPlay ~64 dB quieter than every other source)'
 grep -qE '^[[:space:]]*log_verbosity[[:space:]]*=[[:space:]]*0[[:space:]]*;' "$CONF" \
