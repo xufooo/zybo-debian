@@ -123,6 +123,14 @@
        background:#fff;border:2px solid #7c8aff}
   .ctl .val{font-size:10px;color:#a8b0ff;min-width:56px;text-align:right;
             font-variant-numeric:tabular-nums}
+  .grid-head{display:flex;gap:8px;align-items:center;font-size:10px;color:#8f95a8;
+    padding:2px 0 0}
+  .grid-head .lb{min-width:46px}
+  .grid-head .lb:nth-child(2){flex:1;min-width:0}
+  .ctl[data-grid]{gap:8px}
+  .ctl[data-grid] .lb{min-width:46px}
+  .ctl[data-grid] input[type=range]{flex:1;min-width:0}
+  .ctl[data-grid] .val{min-width:48px;text-align:right}
   .strength{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
   .strength .lb{font-size:10px;color:#8f95a8;margin-right:2px}
 
@@ -205,12 +213,17 @@
     <div class="hint" id="fx-hint"></div>
   </div>
 
-  <!-- Settings (level 3): the values of the selected effect -->
+  
   <div class="section-title">Settings</div>
   <div class="panel" id="fx-settings"></div>
 
+  <!-- Overall: items that belong to no single effect (peak limiter, headroom), always shown -->
+  <div class="section-title">Overall</div>
+  <div class="panel" id="global-settings"></div>
+
   <!-- Genre presets (secondary) -->
-  <details class="presets">
+  
+  <details class="presets" open>
     <summary>Genre presets</summary>
     <div class="panel" style="margin-top:10px">
       <div class="pst-list" id="preset-list"></div>
@@ -274,26 +287,28 @@
 // Entries with only `requires` need a newer engine; the UI greys them out and says why.
 const EFFECTS = [
   { id:'bass',    name:'Deep bass',   desc:'Hear the low end even at low volume', stage:'P0', kind:'bands',
-    bands:[{freq:60,q:0.7,g:1.0},{freq:150,q:0.8,g:0.7}] },
+    w:[1.0, 0.86, 0.4, 0.1, 0, 0, 0] },
   { id:'vocal',   name:'Clear vocals',   desc:'Voices and dialogue step out of the mix', stage:'P0', kind:'bands',
-    bands:[{freq:400,q:0.8,g:-0.5},{freq:1000,q:1.0,g:0.9},{freq:3000,q:1.0,g:1.0}] },
+    w:[0, 0, -0.25, 0.45, 0.5, 0.25, 0] },
   { id:'vocalhd', name:'Detailed vocals', desc:'Brighter lead voices', stage:'P0', kind:'bands',
-    bands:[{freq:400,q:0.8,g:-0.5},{freq:1000,q:1.0,g:0.8},{freq:3000,q:1.2,g:1.0},
-           {freq:6000,q:1.0,g:0.6}] },
+    w:[0, 0, -0.25, 0.4, 0.5, 0.4, 0.15] },
   { id:'soft',    name:'Easy listening',   desc:'Tame harsh treble, comfortable for hours', stage:'P0', kind:'bands',
-    bands:[{freq:3000,q:1.0,g:-0.7},{freq:10000,q:0.8,g:-1.0}] },
+    w:[0, 0, 0, 0, -0.25, -0.3, -0.45] },
   { id:'night',   name:'Late-night', desc:'Stay intelligible at low volume', stage:'P0', kind:'bands',
-    bands:[{freq:60,q:0.7,g:0.8},{freq:150,q:0.8,g:0.6},{freq:3000,q:1.0,g:-0.3},
-           {freq:10000,q:0.8,g:0.5}] },
-  { id:'limiter', name:'Limiter protection',   desc:'Prevents clipping and pops', stage:'P0', kind:'limiter' },
+    w:[0.6, 0.45, 0.1, 0, -0.2, 0, 0.3] },
+  { id:'warm',    name:'Analog warmth',   desc:'Thicker lows, softer sibilance', stage:'P0', kind:'bands',
+    w:[0.5, 0.42, 0.15, 0, -0.2, -0.3, -0.4] },
   // Planned: the reason comes from capabilities.planned and is shown as-is
-  { id:'spatial', name:'3D / headphone stage', desc:'Move the image from inside your head to in front',
+  { id:'spatial', name:'3D / headphone stage', desc:'Moves headphone sound off the top of your head',
     stage:'P2', requires:['crossfeed'] },
   { id:'widener', name:'Stereo widening',   desc:'Wider, more enveloping image',
     stage:'P2', requires:['widener'] },
 ];
 
-const STRENGTH_DB = { light: 2, mid: 4, strong: 6 };
+const STRENGTH_DB = { light: 5, mid: 8, strong: 12 };
+const GRID   = [60, 150, 400, 1000, 3000, 6000, 10000];
+const GRID_Q = [0.7, 0.8, 0.8, 1.0, 1.0, 1.0, 0.8];
+const GGAIN  = 12;
 const STRENGTH_LABEL = { light:'Light', mid:'Medium', strong:'Strong' };
 
 // -- Parameter ranges (match the backend clamp; never offer a value it would clamp) --
@@ -308,6 +323,7 @@ const sliderFromQ    = q => SLIDER_STEPS * Math.log(q / Q_MIN) / Math.log(Q_MAX 
 // ── State ─────────────────────────────────────────────────────────────
 let state = {};          // /api/status
 let caps = null;         // /api/dsp/capabilities
+let dynAvail = false;
 let types = [];          // /api/dsp/types
 let curName = '';        // currently selected type
 let curEffects = [];     // this type's effects (working copy)
@@ -317,6 +333,14 @@ let presets = [];        // genre presets
 // Merely looking at a built-in type must not write it to disk, otherwise
 // tapping "Headphones" creates a same-named user type that shadows the built-in one.
 let dirty = false;
+let appliedPreamp = 0;
+let chainGainDB = 0;
+let dynBass = { on: false, gain: 6 };
+try {
+  const v = JSON.parse(localStorage.getItem('zybo_dynbass') || 'null');
+  if (v && typeof v.on === 'boolean') dynBass = { on: v.on, gain: Math.max(0, Math.min(12, +v.gain || 6)) };
+} catch(e){}
+try { const v = parseFloat(localStorage.getItem('zybo_gain_db')); if (isFinite(v)) chainGainDB = Math.max(0, Math.min(12, v)) } catch(e){}
 const API = '';
 
 const SRC_LABEL = { airplay:'AirPlay', bluetooth:'Bluetooth', dlna:'DLNA' };
@@ -336,6 +360,63 @@ function el(tag, cls, text){
   return e;
 }
 function effectDef(id){ return EFFECTS.find(function(e){ return e.id === id }) }
+function gridBands(def, mode){
+  const base = STRENGTH_DB[mode] || STRENGTH_DB.mid;
+  const w = (def && def.w) ? def.w : GRID.map(function(){ return 0 });
+  return GRID.map(function(f, i){
+    return { type:'peq', enabled:true, freq:f, q:GRID_Q[i],
+             gain_db:+((base * w[i]).toFixed(1)) };
+  });
+}
+function normalizeBands(bands, def, mode){
+  if(!bands || !bands.length) return gridBands(def, mode || 'mid');
+  const out = GRID.map(function(f, i){
+    return { type:'peq', enabled:true, freq:f, q:GRID_Q[i], gain_db:0 };
+  });
+  bands.forEach(function(b){
+    if(!b) return;
+    let i = GRID.indexOf(+b.freq), best = 1e9;
+    GRID.forEach(function(f, k){
+      const d = Math.abs(f - (+b.freq || 0));
+      if(d < best){ best = d; i = k }
+    });
+    out[i].gain_db = +(out[i].gain_db + (+b.gain_db || 0)).toFixed(1);
+    if(b.q) out[i].q = +b.q;
+  });
+  return out;
+}
+function normalizeFx(fx){
+  const def = effectDef(fx.id);
+  if(def && def.kind === 'bands') fx.bands = normalizeBands(fx.bands, def, fx.mode);
+  return fx;
+}
+function isBandFx(fx){ const d = effectDef(fx.id); return !!(d && (d.kind === 'bands' || d.requires)) }
+function chipEffects(){ return curEffects.filter(isBandFx) }
+function limiterFx(){
+  let fx = curEffects.find(function(e){ return e.id === 'limiter' });
+  if(!fx){
+    fx = { id:'limiter', enabled:true, mode: truepeakAvailable() ? 'truepeak' : 'feedback',
+           params:{ thr_db:-1, att_ms:0.09, rel_ms:43 }, bands:[] };
+  }
+  return fx;
+}
+function mergedChain(){
+  const acc = GRID.map(function(f, i){ return { freq:f, q:GRID_Q[i], gain_db:0, w:0 } });
+  curEffects.forEach(function(fx){
+    if(!fx.enabled || !isBandFx(fx)) return;
+    if(effectDef(fx.id).requires) return;
+    (fx.bands || []).forEach(function(b){
+      let i = GRID.indexOf(+b.freq);
+      if(i < 0) return;
+      acc[i].gain_db += (+b.gain_db || 0);
+      if(Math.abs(b.gain_db) > acc[i].w){ acc[i].w = Math.abs(b.gain_db); acc[i].q = b.q || GRID_Q[i] }
+    });
+  });
+  return acc.filter(function(b){ return Math.abs(b.gain_db) >= 0.05 })
+            .map(function(b){ return { type:'peq', enabled:true, freq:b.freq,
+                                       gain_db:+(b.gain_db.toFixed(1)), q:b.q } });
+}
+function fmtGainDB(v){ return (v >= 0 ? '+' : '') + (+v).toFixed(1) + ' dB' }
 
 // -- Notice bar (the only error outlet; no alert(), jsdom would swallow it) --
 let noticeTimer = null;
@@ -398,6 +479,8 @@ function renderEngineLine(){
 async function loadCaps(){
   try { caps = await api('/api/dsp/capabilities') }
   catch(e){ caps = null; showNotice('Cannot read engine capabilities: ' + e.message) }
+  dynAvail = !!(caps && caps.dyn_bass && caps.dyn_bass.available);
+  if(!dynAvail) dynBass.on = false;
   renderEngineLine();
 }
 
@@ -421,12 +504,13 @@ let BUILTIN_NAMES = [];
 // Deep-copy effects into a working copy (never mutate the objects inside `types`)
 function cloneEffects(list){
   return (list || []).map(function(e){
-    return { id:e.id, enabled:!!e.enabled, mode:e.mode || '',
-             params: Object.assign({}, e.params || {}),
-             bands: (e.bands || []).map(function(b){
-               return { type:b.type || 'peq', enabled:true,
-                        freq:+b.freq, gain_db:+b.gain_db, q:+b.q };
-             }) };
+    const fx = { id:e.id, enabled:!!e.enabled, mode:e.mode || '',
+                 params: Object.assign({}, e.params || {}),
+                 bands: (e.bands || []).map(function(b){
+                   return { type:b.type || 'peq', enabled:true,
+                            freq:+b.freq, gain_db:+b.gain_db, q:+b.q };
+                 }) };
+    return normalizeFx(fx);
   });
 }
 
@@ -582,7 +666,7 @@ function renderChips(){
   const box = $('fx-list');
   if(!box) return;
   box.innerHTML = '';
-  curEffects.forEach(function(fx){
+  chipEffects().forEach(function(fx){
     const def = effectDef(fx.id);
     const grey = !!(def && def.requires);
     const cls = 'fx-chip' + (fx.enabled && !grey ? ' on' : '') +
@@ -604,35 +688,31 @@ function renderChips(){
     }
     box.appendChild(chip);
   });
-  if(!curEffects.length) box.appendChild(el('div','hint','This type has no effects yet; use the button below'));
+  if(!curEffects.length) box.appendChild(el('div','hint','This type has no effects yet; add one with "+ Add a card" below'));
 }
 
-// Level 3: the values of the selected effect
 function renderSettings(){
   const box = $('fx-settings');
   if(!box) return;
   box.innerHTML = '';
-  let fx = curEffects.find(function(e){ return e.id === selectedFx });
-  if(!fx) fx = curEffects[0];                 // selection was deleted or the type changed: fall back
-  if(!fx){ box.appendChild(el('div','hint','This type has no effects yet')); return }
-  selectedFx = fx.id;                          // remember the fallback so the right label is highlighted
+  const chips = chipEffects();
+  let fx = chips.find(function(e){ return e.id === selectedFx }) || chips[0];
+  if(!fx){
+    selectedFx = '';
+    box.appendChild(el('div','hint','This type has no effects yet; add one with "+ Add a card" below'));
+    return;
+  }
+  selectedFx = fx.id;
 
   const def = effectDef(fx.id);
   const grey = !!(def && def.requires);
+  if(!fx.bands || !fx.bands.length) fx.bands = gridBands(def, fx.mode || 'mid');
+  fx.bands = normalizeBands(fx.bands, def, fx.mode);
 
   // The settings panel does NOT repeat the effect name (the label above shows it);
-  // and it ALWAYS shows the full set: on/off, strength and every section value,
-  // even while the effect is off, so values can be set up and saved in advance.
-  if(def && def.kind === 'bands' && (!fx.bands || !fx.bands.length)){
-    fx.mode = fx.mode || 'mid';
-    fx.bands = bandsFromStrength(def, fx.mode);   // untouched: seed the defaults so the panel is complete
-    syncCurType();
-  }
-
   if(def && def.desc) box.appendChild(el('div','set-desc', def.desc));
   if(grey) box.appendChild(el('div','set-why', plannedReason(def.requires) || 'Not supported by this engine yet'));
 
-  // On/off gets its own row: it is a setting too
   const swRow = el('div','ctl');
   swRow.appendChild(el('span','lb','On/off'));
   const sw = el('button','fx-sw' + (fx.enabled && !grey ? ' on' : ''));
@@ -641,38 +721,84 @@ function renderSettings(){
   sw.addEventListener('click', function(){
     if(grey) return;
     fx.enabled = !fx.enabled;
-    if(fx.enabled && def && def.kind === 'bands' && (!fx.bands || !fx.bands.length)){
-      fx.mode = fx.mode || 'mid';
-      fx.bands = bandsFromStrength(def, fx.mode);   // first time on: lay out sections at the default step
-    }
+    if(fx.enabled && (!fx.bands || !fx.bands.length)) fx.bands = gridBands(def, fx.mode || 'mid');
     dirty = true; syncCurType(); renderFx(); applyCurrent();
   });
   swRow.appendChild(sw);
   swRow.appendChild(el('span','sw-state', fx.enabled ? 'on' : 'off'));
   box.appendChild(swRow);
 
-  if(grey){
-    box.appendChild(el('div','hint','This effect needs a newer engine, so it cannot be adjusted yet.'));
-  } else {
-    const body = el('div','set-body');
-    const kind = def ? def.kind : '';
-    if(kind === 'bands') renderBandControls(body, fx, def);
-    else if(kind === 'limiter') renderLimiterControls(body, fx);
-    else body.appendChild(el('div','hint','This effect has no adjustable values yet'));
-    box.appendChild(body);
-    if(!fx.enabled){
-      box.appendChild(el('div','hint','Currently off: the values above are saved into this type and take effect once it is on.'));
-    }
+  const st = el('div','strength');
+  st.appendChild(el('span','lb','Strength'));
+  ['light','mid','strong'].forEach(function(k){
+    const b = el('button','btn sm' + (fx.mode === k ? ' active' : ''), STRENGTH_LABEL[k]);
+    b.dataset.strength = k;
+    if(grey) b.disabled = true;
+    b.addEventListener('click', function(){
+      if(grey) return;
+      fx.mode = k;
+      fx.bands = gridBands(def, k);
+      dirty = true; syncCurType(); renderFx(); applyCurrent();
+    });
+    st.appendChild(b);
+  });
+  box.appendChild(st);
+
+  const g = el('div','grid-head');
+  g.appendChild(el('span','lb','Band'));
+  g.appendChild(el('span','lb','Gain'));
+  g.appendChild(el('span','lb','Q'));
+  box.appendChild(g);
+  fx.bands.forEach(function(band, i){ box.appendChild(gridRow(band, i, grey)) });
+  if(!fx.enabled){
+    box.appendChild(el('div','hint','Currently off: the values above are stored in this type and take effect once it is on.'));
+  }
+  if(!grey){
     const rm = el('button','btn sm danger','✕ Remove this effect from the type');
     rm.id = 'fx-remove';
     rm.addEventListener('click', function(){
       const i = curEffects.findIndex(function(e){ return e.id === fx.id });
       if(i >= 0) curEffects.splice(i,1);
-      if(selectedFx === fx.id) selectedFx = curEffects.length ? curEffects[0].id : '';
+      selectedFx = '';
       dirty = true; syncCurType(); renderFx(); applyCurrent();
     });
     box.appendChild(rm);
   }
+}
+
+function gridRow(band, i, grey){
+  const row = el('div','ctl');
+  row.dataset.grid = i;
+  row.appendChild(el('span','lb', (GRID[i] >= 1000 ? (GRID[i]/1000) + ' kHz' : GRID[i] + ' Hz')));
+
+  const g = document.createElement('input');
+  g.type = 'range'; g.min = -GGAIN; g.max = GGAIN; g.step = 0.5;
+  g.value = Math.max(-GGAIN, Math.min(GGAIN, +band.gain_db || 0));
+  g.dataset.param = 'gain'; g.dataset.grid = i;
+  g.setAttribute('aria-label', GRID[i] + ' Hz gain');
+  if(grey) g.disabled = true;
+  const gv = el('span','val', fmtGainDB(+g.value));
+  g.addEventListener('input', function(){
+    band.gain_db = +(+g.value).toFixed(1);
+    gv.textContent = fmtGainDB(band.gain_db);
+    dirty = true; syncCurType(); applyCurrent();
+  });
+  row.appendChild(g); row.appendChild(gv);
+
+  const q = document.createElement('input');
+  q.type = 'range'; q.min = 0; q.max = SLIDER_STEPS; q.step = 1;
+  q.value = Math.round(sliderFromQ(+band.q || GRID_Q[i]));
+  q.dataset.param = 'q'; q.dataset.grid = i;
+  q.setAttribute('aria-label', GRID[i] + ' Hz Q');
+  if(grey) q.disabled = true;
+  const qv = el('span','val', (+band.q || GRID_Q[i]).toFixed(2));
+  q.addEventListener('input', function(){
+    band.q = +qFromSlider(parseFloat(q.value)).toFixed(2);
+    qv.textContent = band.q.toFixed(2);
+    dirty = true; syncCurType(); applyCurrent();
+  });
+  row.appendChild(q); row.appendChild(qv);
+  return row;
 }
 
 // Redraw levels 2 and 3 together (call sites only know this one name)
@@ -680,47 +806,76 @@ function renderFx(){
   renderChips();
   renderSettings();
   renderFxActions();
+  renderGlobal();
 }
 
-// strength step x weight -> section gains
-function bandsFromStrength(def, mode){
-  const base = STRENGTH_DB[mode] || STRENGTH_DB.mid;
-  return def.bands.map(function(b){
-    return { type:'peq', enabled:true, freq:b.freq,
-             gain_db:+(base*b.g).toFixed(1), q:b.q };
-  });
-}
+function renderGlobal(){
+  const box = $('global-settings');
+  if(!box) return;
+  box.innerHTML = '';
 
-function renderBandControls(body, fx, def){
-  const st = el('div','strength');
-  st.appendChild(el('span','lb','Strength'));
-  ['light','mid','strong'].forEach(function(k){
-    const b = el('button','btn sm' + (fx.mode === k ? ' active' : ''), STRENGTH_LABEL[k]);
-    b.dataset.strength = k;
-    b.addEventListener('click', function(){
-      fx.mode = k;
-      fx.bands = bandsFromStrength(def, k);   // new step = lay the sections out again (then tweak each)
-      dirty = true; syncCurType(); renderFx(); applyCurrent();
-    });
-    st.appendChild(b);
-  });
-  body.appendChild(st);
+  const r = el('div','ctl');
+  r.appendChild(el('span','lb','Overall headroom'));
+  const v = el('span','val', appliedPreamp <= -0.05 ? appliedPreamp.toFixed(1) + ' dB' : '0 dB');
+  r.appendChild(v);
+  box.appendChild(r);
+  box.appendChild(el('div','hint', appliedPreamp <= -0.05
+    ? 'Boosted bands push peaks past full scale, so the chain is attenuated by the largest boost first (same rule as EqualizerAPO Preamp / EasyEffects Auto Gain).'
+    : 'This chain has no boost (or it is inside the dead zone), so nothing is attenuated.'));
 
-  fx.bands.forEach(function(band, bi){
-    body.appendChild(sliderRow('Freq', sliderFromFreq(band.freq), function(v){
-      band.freq = +freqFromSlider(v).toFixed(0);
-      return band.freq + ' Hz';
-    }, bi, 'freq'));
-    body.appendChild(sliderRow('Gain', (band.gain_db + GAIN_LIM) / (2*GAIN_LIM) * SLIDER_STEPS,
-    function(v){
-      band.gain_db = +(v / SLIDER_STEPS * 2*GAIN_LIM - GAIN_LIM).toFixed(1);
-      return (band.gain_db >= 0 ? '+' : '') + band.gain_db.toFixed(1) + ' dB';
-    }, bi, 'gain'));
-    body.appendChild(sliderRow('Q', sliderFromQ(band.q), function(v){
-      band.q = +qFromSlider(v).toFixed(2);
-      return band.q.toFixed(2);
-    }, bi, 'q'));
+  const dRow = el('div','ctl');
+  dRow.appendChild(el('span','lb','Dynamic bass'));
+  const dSw = el('button','fx-sw' + (dynBass.on && dynAvail ? ' on' : ''));
+  dSw.id = 'dynbass-sw';
+  dSw.setAttribute('aria-label', 'Dynamic bass on/off');
+  if(!dynAvail) dSw.disabled = true;
+  else dSw.addEventListener('click', function(){
+    dynBass.on = !dynBass.on;
+    try { localStorage.setItem('zybo_dynbass', JSON.stringify(dynBass)) } catch(e){}
+    renderGlobal(); applyCurrent();
   });
+  dRow.appendChild(dSw);
+  dRow.appendChild(el('span','sw-state', (dynBass.on && dynAvail) ? 'on' : 'off'));
+  box.appendChild(dRow);
+  const gRow = el('div','ctl');
+  gRow.appendChild(el('span','lb','Bass boost'));
+  const din = document.createElement('input');
+  din.type = 'range'; din.min = 0; din.max = 12; din.step = 1;
+  din.value = String(dynBass.gain);
+  din.id = 'dynbass-gain';
+  din.setAttribute('aria-label', 'Dynamic bass amount');
+  if(!dynAvail) din.disabled = true;
+  const dval = el('span','val', '+' + dynBass.gain.toFixed(0) + ' dB');
+  din.addEventListener('input', function(){
+    dynBass.gain = +din.value;
+    dval.textContent = '+' + dynBass.gain.toFixed(0) + ' dB';
+    try { localStorage.setItem('zybo_dynbass', JSON.stringify(dynBass)) } catch(e){}
+    applyCurrent();
+  });
+  gRow.appendChild(din); gRow.appendChild(dval);
+  box.appendChild(gRow);
+  box.appendChild(el('div','hint', !dynAvail
+    ? 'This bitstream has no dynamic bass (it needs the 0.2 bitstream): see the engine line above.'
+    : (dynBass.on
+      ? ('Dynamic bass on: quiet passages are lifted by up to ' + dynBass.gain.toFixed(0) + ' dB and it backs off when loud (so it never shrinks the whole mix).')
+      : 'Dynamic bass is off. Turn it on: quiet passages get more low end, loud ones are not pushed over.')));
+
+  const lim = limiterFx();
+  const swRow = el('div','ctl');
+  swRow.appendChild(el('span','lb','Peak limiter'));
+  const sw = el('button','fx-sw' + (lim.enabled ? ' on' : ''));
+  sw.id = 'lim-sw';
+  sw.setAttribute('aria-label', 'Peak limiter on/off');
+  sw.addEventListener('click', function(){
+    lim.enabled = !lim.enabled; dirty = true; syncCurType(); renderGlobal(); applyCurrent();
+  });
+  swRow.appendChild(sw);
+  swRow.appendChild(el('span','sw-state', lim.enabled ? 'on' : 'off'));
+  box.appendChild(swRow);
+
+  const body = el('div','set-body');
+  renderLimiterControls(body, lim);
+  box.appendChild(body);
 }
 
 // One row = label + slider + value. Dragging only updates the value cell
@@ -813,7 +968,7 @@ function renderFxActions(){
       const def = effectDef(pick.value);
       if(!def) return;
       const fx = { id:def.id, enabled:!def.requires, mode:'mid', params:{}, bands:[] };
-      if(def.kind === 'bands') fx.bands = bandsFromStrength(def, 'mid');
+      if(def.kind === 'bands') fx.bands = gridBands(def, 'mid');
       if(def.kind === 'limiter'){
         fx.enabled = true; fx.mode = truepeakAvailable() ? 'truepeak' : 'feedback';
         fx.params = { thr_db:-1, att_ms:0.09, rel_ms:43 };
@@ -826,22 +981,11 @@ function renderFxActions(){
   }
   const hint = $('fx-hint');
   if(hint){
-    const used = enabledBands();
-    hint.textContent = 'Using ' + used + ' / ' + maxBands() + ' bands' +
-      (used > maxBands() ? ' (over the limit, applying will be rejected)' : '') +
-      '; these cards belong to the type "' + curName + '"';
+    const used = mergedChain().length;
+    hint.textContent = 'These cards belong to type "' + curName + '": ' +
+      chipEffects().length + ' cards merge into ' + used + ' sections (limit ' + maxBands() + ')';
     hint.style.color = used > maxBands() ? '#f0a8b4' : '';
   }
-}
-
-function enabledBands(){
-  let n = 0;
-  curEffects.forEach(function(fx){
-    if(!fx.enabled) return;
-    const def = effectDef(fx.id);
-    if(def && def.kind === 'bands') n += (fx.bands || []).length;
-  });
-  return n;
 }
 
 // -- Pushing to the hardware (debounced) --
@@ -854,47 +998,39 @@ function applyCurrent(){           // collapse a drag into one push
 async function applyNow(){
   if(applyTimer){ clearTimeout(applyTimer); applyTimer = null }
 
-  // (1) chain: collect the sections of every enabled bands effect, sorted by frequency
-  const items = [];
-  curEffects.forEach(function(fx){
-    if(!fx.enabled) return;
-    const def = effectDef(fx.id);
-    if(!def || def.kind !== 'bands') return;
-    (fx.bands || []).forEach(function(b){
-      items.push({ type:b.type || 'peq', enabled:true,
-                   freq:+b.freq, gain_db:+b.gain_db, q:+b.q });
-    });
-  });
-  items.sort(function(a,b){ return a.freq - b.freq });
+  const items = mergedChain();
 
   if(items.length > maxBands()){
     // No truncation: say what the backend would say (it will refuse as well)
-    showNotice('This type needs ' + items.length + ' bands, this device has ' + maxBands() + ' bands',
+    showNotice('This chain needs ' + items.length + ' sections but the hardware has ' + maxBands() + ' sections',
       'err', ['Turn a card off or enable fewer sections; nothing is dropped for you silently.']);
   } else {
     try {
-      const d = await postJSON('/api/dsp/chain', { chain: items }, 'PUT');
-      if(d && typeof d.preamp_db === 'number' && d.preamp_db < -0.05){
-        showNotice('Applied (' + d.applied + ' bands). Overall level reduced by ' +
-          Math.abs(d.preamp_db).toFixed(1) + ' dB', 'ok');
+      const body = { chain: items };
+      if(dynAvail) body.dyn_bass = (dynBass.on ? { gain_db: dynBass.gain } : { off: true });
+      const d = await postJSON('/api/dsp/chain', body, 'PUT');
+      if(d && typeof d.preamp_db === 'number'){
+        appliedPreamp = d.preamp_db;
+        renderGlobal();
+        if(d.preamp_db < -0.05){
+          showNotice('Applied (' + d.applied + ' bands). Overall level reduced by ' +
+            Math.abs(d.preamp_db).toFixed(1) + ' dB', 'ok');
+        }
       }
     } catch(e){
       showNotice('This chain was not applied', 'err', [e.message]);
     }
   }
 
-  // (2) limiter: an optional stage at the end of the chain, not a chain section
-  const lim = fxState('limiter');
-  if(lim){
-    try {
-      const p = lim.params || {};
-      await postJSON('/api/dsp/limiter', {
-        enabled: !!lim.enabled,
-        mode: lim.mode || 'feedback',
-        thr_db: (typeof p.thr_db === 'number') ? p.thr_db : -1,
-      });
-    } catch(e){ showNotice('Limiter setting failed', 'err', [e.message]) }
-  }
+  const lim = limiterFx();
+  try {
+    const p = lim.params || {};
+    await postJSON('/api/dsp/limiter', {
+      enabled: !!lim.enabled,
+      mode: lim.mode || 'feedback',
+      thr_db: (typeof p.thr_db === 'number') ? p.thr_db : -1,
+    });
+  } catch(e){ showNotice('Limiter setting failed', 'err', [e.message]) }
 
   // (3) remember this type -- only written to disk when the user really changed it
   if(!dirty) return;
@@ -1088,6 +1224,16 @@ $('btn-reboot').addEventListener('click', function(){
 // presets. The other way round draws one frame assuming "6 bands and both modes".
 (async function init(){
   await loadCaps();
+  try {
+    const st = await api('/api/status');
+    if(st && st.dsp && typeof st.dsp.preamp_db === 'number') appliedPreamp = st.dsp.preamp_db;
+  } catch(e){}
+  try {
+    const ch = await api('/api/dsp/chain');
+    const db = ch && ch.dyn_bass;
+    if(db) dynBass = { on: true, gain: Math.max(0, Math.min(12, +db.gain_db || 6)) };
+    else if(ch) dynBass = { on: false, gain: dynBass.gain };
+  } catch(e){}
   await Promise.all([loadTypes(), loadPresets()]);
   curName = types.length ? types[0].name : '';
   curEffects = cloneEffects(curType() ? curType().effects : []);
