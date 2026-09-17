@@ -76,17 +76,25 @@
   .type-item .mk{font-size:9px;color:#7d8299}
   .type-item.active .mk{color:#8f95a8}
 
-  /* effect cards */
-  .fx-list{display:flex;flex-direction:column;gap:8px}
-  .fx{background:#1a1a2e;border-radius:12px;padding:12px;border:1px solid transparent}
-  .fx.on{border-color:#3d5a8a}
-  .fx.grey{opacity:.5}
-  .fx-head{display:flex;align-items:flex-start;gap:10px}
-  .fx-main{flex:1;min-width:0}
-  .fx-name{font-size:13px;font-weight:600;color:#dcdcf0;display:flex;align-items:center;gap:6px}
+  /* Effects: this row is just labels/selectors; the values appear in the Settings panel below */
+  .fx-list{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+  .fx-chip{padding:8px 12px;min-height:34px;border-radius:9px;background:#25253e;
+           border:1px solid transparent;color:#8f95a8;font-size:12px;font-weight:600;
+           cursor:pointer;display:flex;align-items:center;gap:6px}
+  .fx-chip.on{color:#dcdcf0}
+  .fx-chip.sel{border-color:#7c8aff;color:#a8b0ff;background:#1a1a3e}
+  .fx-chip.grey{opacity:.5;cursor:not-allowed}
+  .fx-chip .dot{width:7px;height:7px;border-radius:50%;background:#4a4a63;flex:0 0 auto}
+  .fx-chip.on .dot{background:#7c8aff}
   .fx-tag{font-size:9px;padding:1px 5px;border-radius:6px;background:#25253e;color:#8f95a8;font-weight:600}
-  .fx-desc{font-size:11px;color:#8f95a8;margin-top:3px;line-height:1.45}
-  .fx-why{font-size:10px;color:#c9a06a;margin-top:4px;line-height:1.45}
+  /* Settings panel (level 3): the values of the selected effect */
+  .set-head{display:flex;align-items:flex-start;gap:10px}
+  .set-main{flex:1;min-width:0}
+  .set-name{font-size:13px;font-weight:600;color:#dcdcf0;display:flex;align-items:center;gap:6px}
+  .set-desc{font-size:11px;color:#8f95a8;margin-top:3px;line-height:1.45}
+  .set-why{font-size:10px;color:#c9a06a;margin-top:4px;line-height:1.45}
+  .set-body{margin-top:10px;padding-top:10px;border-top:1px solid #25253e;
+            display:flex;flex-direction:column;gap:10px}
   /* The switch is a button, so it is easy to tap (and to test) */
   .fx-sw{width:42px;height:24px;border-radius:12px;background:#25253e;border:none;
          position:relative;cursor:pointer;flex:0 0 auto;transition:background .15s}
@@ -95,8 +103,6 @@
   .fx-sw.on{background:#3d5a8a}
   .fx-sw.on::after{left:21px;background:#fff}
   .fx-sw:disabled{cursor:not-allowed}
-  .fx-body{margin-top:10px;padding-top:10px;border-top:1px solid #25253e;
-           display:flex;flex-direction:column;gap:10px}
   .fx-x{background:transparent;border:none;color:#7d8299;font-size:12px;
         cursor:pointer;padding:2px 4px;border-radius:6px}
   .fx-x:hover{color:#c4646e;background:#25253e}
@@ -193,13 +199,17 @@
     <div class="hint" id="type-hint"></div>
   </div>
 
-  <!-- Effects: this type's own set of cards -->
+  <!-- Effects (level 2): this type's own effects -- just a row of labels; tap one to select -->
   <div class="section-title">Effects</div>
-  <div class="fx-list" id="fx-list"></div>
-  <div class="panel" style="margin-top:8px">
-    <div class="row-wrap" style="margin-top:0" id="fx-actions"></div>
+  <div class="panel">
+    <div class="fx-list" id="fx-list"></div>
+    <div class="row-wrap" id="fx-actions"></div>
     <div class="hint" id="fx-hint"></div>
   </div>
+
+  <!-- Settings (level 3): the values of the selected effect -->
+  <div class="section-title">Settings</div>
+  <div class="panel" id="fx-settings"></div>
 
   <!-- Genre presets (secondary) -->
   <details class="presets">
@@ -302,7 +312,8 @@ let state = {};          // /api/status
 let caps = null;         // /api/dsp/capabilities
 let types = [];          // /api/dsp/types
 let curName = '';        // currently selected type
-let curEffects = [];     // that type's cards (working copy)
+let curEffects = [];     // this type's effects (working copy)
+let selectedFx = '';     // which effect the Settings panel is showing (level-2 selection)
 let presets = [];        // genre presets
 // dirty: has the user actually CHANGED this type's settings?
 // Merely looking at a built-in type must not write it to disk, otherwise
@@ -483,8 +494,9 @@ async function selectType(name){
   if(!t) return;
   curName = name;
   curEffects = cloneEffects(t.effects);
+  selectedFx = curEffects.length ? curEffects[0].id : '';   // first effect of the new type
   dirty = false;        // just looking: apply its settings, do not save
-  renderTypes(); renderCards();
+  renderTypes(); renderFx();
   await applyNow();     // switching type swaps everything: push it now
 }
 
@@ -503,7 +515,7 @@ async function newType(){
   }
   types.push({ name:name.trim(), note:'', builtin:false, effects: cloneEffects(curEffects) });
   curName = name.trim();
-  renderTypes(); renderCards(); await applyNow();
+  renderTypes(); renderFx(); await applyNow();
   showNotice('Created type "' + curName + '" (copied from the current one)', 'ok');
 }
 
@@ -516,7 +528,7 @@ async function copyType(){
   }
   types.push({ name:name.trim(), note:'', builtin:false, effects: cloneEffects(curEffects) });
   curName = name.trim();
-  renderTypes(); renderCards(); await applyNow();
+  renderTypes(); renderFx(); await applyNow();
   showNotice('Copied to "' + curName + '"', 'ok');
 }
 
@@ -530,7 +542,7 @@ async function renameType(){
     await loadTypes();
     curName = to.trim();
     curEffects = cloneEffects(curType() ? curType().effects : []);
-    renderTypes(); renderCards();
+    renderTypes(); renderFx();
     showNotice('Renamed to "' + curName + '"', 'ok');
   } catch(e){ showNotice('Rename failed', 'err', [e.message]) }
 }
@@ -544,7 +556,7 @@ async function deleteType(){
     await loadTypes();
     curName = types.length ? types[0].name : '';
     curEffects = cloneEffects(curType() ? curType().effects : []);
-    renderTypes(); renderCards(); await applyNow();
+    renderTypes(); renderFx(); await applyNow();
     showNotice('Deleted', 'ok');
   } catch(e){ showNotice('Delete failed', 'err', [e.message]) }
 }
@@ -559,7 +571,7 @@ async function restoreBuiltin(){
     await loadTypes();
     const back = types.find(function(x){ return x.name === t.name });
     curEffects = cloneEffects(back ? back.effects : []);
-    renderTypes(); renderCards(); await applyNow();
+    renderTypes(); renderFx(); await applyNow();
     showNotice('Restored the built-in settings', 'ok');
   } catch(e){ showNotice('Restore failed', 'err', [e.message]) }
 }
@@ -567,65 +579,105 @@ async function restoreBuiltin(){
 // -- Effect cards --
 function fxState(id){ return curEffects.find(function(e){ return e.id === id }) }
 
-function renderCards(){
+// Level 2: effect labels (just names plus an on/off dot; tapping one shows its values below)
+function renderChips(){
   const box = $('fx-list');
   if(!box) return;
   box.innerHTML = '';
-  curEffects.forEach(function(fx, idx){
+  curEffects.forEach(function(fx){
     const def = effectDef(fx.id);
     const grey = !!(def && def.requires);
-    const div = el('div','fx' + (fx.enabled && !grey ? ' on' : '') + (grey ? ' grey' : ''));
-    div.dataset.fx = fx.id;
-
-    const head = el('div','fx-head');
-    const main = el('div','fx-main');
-    const nm = el('div','fx-name');
-    nm.appendChild(document.createTextNode(def ? def.name : fx.id));
-    if(def && def.stage) nm.appendChild(el('span','fx-tag', def.stage));
-    main.appendChild(nm);
-    if(def && def.desc) main.appendChild(el('div','fx-desc', def.desc));
-    if(grey) main.appendChild(el('div','fx-why', plannedReason(def.requires) || 'Not supported by this engine yet'));
-    head.appendChild(main);
-
-    if(!grey){
-      const rm = el('button','fx-x','✕');
-      rm.title = 'Remove this card from the type';
-      rm.setAttribute('aria-label','Remove ' + (def ? def.name : fx.id));
-      rm.addEventListener('click', function(ev){
-        ev.stopPropagation();
-        curEffects.splice(idx,1); dirty = true; syncCurType(); renderCards(); applyCurrent();
+    const cls = 'fx-chip' + (fx.enabled && !grey ? ' on' : '') +
+                (grey ? ' grey' : '') + (fx.id === selectedFx ? ' sel' : '');
+    const chip = el('div', cls);
+    chip.dataset.fx = fx.id;
+    chip.appendChild(el('span','dot'));
+    chip.appendChild(document.createTextNode(def ? def.name : fx.id));
+    if(grey) chip.appendChild(el('span','fx-tag','P2'));
+    if(grey){
+      chip.title = plannedReason(def.requires) || 'Not supported by this engine yet';
+      chip.addEventListener('click', function(){
+        selectedFx = fx.id; renderFx();
+        showNotice('Effect ' + (def.name) + ' is not usable yet', 'warn',
+          [plannedReason(def.requires) || 'needs a newer engine']);
       });
-      head.appendChild(rm);
+    } else {
+      chip.addEventListener('click', function(){ selectedFx = fx.id; renderFx() });
     }
-
-    const sw = el('button','fx-sw' + (fx.enabled && !grey ? ' on' : ''));
-    sw.setAttribute('aria-label', (def ? def.name : fx.id) + ' switch');
-    if(grey) sw.disabled = true;
-    sw.addEventListener('click', function(ev){
-      ev.stopPropagation();
-      if(grey) return;
-      fx.enabled = !fx.enabled;
-      if(fx.enabled && def && def.kind === 'bands' && (!fx.bands || !fx.bands.length)){
-        fx.mode = fx.mode || 'mid';
-        fx.bands = bandsFromStrength(def, fx.mode);   // first time on: lay out sections at the default step
-      }
-      dirty = true; syncCurType(); renderCards(); applyCurrent();
-    });
-    head.appendChild(sw);
-    div.appendChild(head);
-
-    // The values only appear while the card is ON (when off they mean nothing)
-    if(fx.enabled && !grey){
-      const body = el('div','fx-body');
-      const kind = def ? def.kind : '';
-      if(kind === 'bands') renderBandControls(body, fx, def);
-      else if(kind === 'limiter') renderLimiterControls(body, fx);
-      else body.appendChild(el('div','hint','This effect has no adjustable values yet'));
-      div.appendChild(body);
-    }
-    box.appendChild(div);
+    box.appendChild(chip);
   });
-  if(!curEffects.length) box.appendChild(el('div','hint','This type has no effect cards yet'));
+  if(!curEffects.length) box.appendChild(el('div','hint','This type has no effects yet; use the button below'));
+}
+
+// Level 3: the values of the selected effect
+function renderSettings(){
+  const box = $('fx-settings');
+  if(!box) return;
+  box.innerHTML = '';
+  let fx = curEffects.find(function(e){ return e.id === selectedFx });
+  if(!fx) fx = curEffects[0];                 // selection was deleted or the type changed: fall back
+  if(!fx){ box.appendChild(el('div','hint','This type has no effects yet')); return }
+  selectedFx = fx.id;                          // remember the fallback so the right label is highlighted
+
+  const def = effectDef(fx.id);
+  const grey = !!(def && def.requires);
+
+  const head = el('div','set-head');
+  const main = el('div','set-main');
+  const nm = el('div','set-name');
+  nm.appendChild(document.createTextNode(def ? def.name : fx.id));
+  if(def && def.stage) nm.appendChild(el('span','fx-tag', def.stage));
+  main.appendChild(nm);
+  if(def && def.desc) main.appendChild(el('div','set-desc', def.desc));
+  if(grey) main.appendChild(el('div','set-why', plannedReason(def.requires) || 'Not supported by this engine yet'));
+  head.appendChild(main);
+
+  const sw = el('button','fx-sw' + (fx.enabled && !grey ? ' on' : ''));
+  sw.setAttribute('aria-label', (def ? def.name : fx.id) + ' switch');
+  if(grey) sw.disabled = true;
+  sw.addEventListener('click', function(){
+    if(grey) return;
+    fx.enabled = !fx.enabled;
+    if(fx.enabled && def && def.kind === 'bands' && (!fx.bands || !fx.bands.length)){
+      fx.mode = fx.mode || 'mid';
+      fx.bands = bandsFromStrength(def, fx.mode);   // first time on: lay out sections at the default step
+    }
+    dirty = true; syncCurType(); renderFx(); applyCurrent();
+  });
+  head.appendChild(sw);
+
+  if(!grey){
+    const rm = el('button','fx-x','✕');
+    rm.title = 'Remove this effect from the type';
+    rm.setAttribute('aria-label','Remove ' + (def ? def.name : fx.id));
+    rm.addEventListener('click', function(){
+      const i = curEffects.findIndex(function(e){ return e.id === fx.id });
+      if(i >= 0) curEffects.splice(i,1);
+      if(selectedFx === fx.id) selectedFx = curEffects.length ? curEffects[0].id : '';
+      dirty = true; syncCurType(); renderFx(); applyCurrent();
+    });
+    head.appendChild(rm);
+  }
+  box.appendChild(head);
+
+  if(grey){
+    box.appendChild(el('div','hint','This effect needs a newer engine (see the reason above); it cannot be adjusted yet.'));
+  } else if(!fx.enabled){
+    box.appendChild(el('div','hint','This effect is off; its values appear here once it is on.'));
+  } else {
+    const body = el('div','set-body');
+    const kind = def ? def.kind : '';
+    if(kind === 'bands') renderBandControls(body, fx, def);
+    else if(kind === 'limiter') renderLimiterControls(body, fx);
+    else body.appendChild(el('div','hint','This effect has no adjustable values yet'));
+    box.appendChild(body);
+  }
+}
+
+// Redraw levels 2 and 3 together (call sites only know this one name)
+function renderFx(){
+  renderChips();
+  renderSettings();
   renderFxActions();
 }
 
@@ -647,7 +699,7 @@ function renderBandControls(body, fx, def){
     b.addEventListener('click', function(){
       fx.mode = k;
       fx.bands = bandsFromStrength(def, k);   // new step = lay the sections out again (then tweak each)
-      dirty = true; syncCurType(); renderCards(); applyCurrent();
+      dirty = true; syncCurType(); renderFx(); applyCurrent();
     });
     st.appendChild(b);
   });
@@ -708,7 +760,7 @@ function renderLimiterControls(body, fx){
           ['Older bitstreams only carry the feedback limiter; this becomes clickable with a newer one']);
         return;
       }
-      fx.mode = pair[0]; dirty = true; syncCurType(); renderCards(); applyCurrent();
+      fx.mode = pair[0]; dirty = true; syncCurType(); renderFx(); applyCurrent();
     });
     st.appendChild(b);
   });
@@ -766,7 +818,8 @@ function renderFxActions(){
         fx.params = { thr_db:-1, att_ms:0.09, rel_ms:43 };
       }
       curEffects.push(fx);
-      dirty = true; syncCurType(); renderCards(); applyCurrent();
+      selectedFx = fx.id;                    // select the card just added so its settings show above
+      dirty = true; syncCurType(); renderFx(); applyCurrent();
     });
     acts.appendChild(add);
   }
@@ -1037,7 +1090,7 @@ $('btn-reboot').addEventListener('click', function(){
   await Promise.all([loadTypes(), loadPresets()]);
   curName = types.length ? types[0].name : '';
   curEffects = cloneEffects(curType() ? curType().effects : []);
-  renderTypes(); renderCards();
+  renderTypes(); renderFx();
   fetchStatus(); connectWS();
 })();
 </script>
