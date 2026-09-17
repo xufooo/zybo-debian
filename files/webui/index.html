@@ -87,12 +87,10 @@
   .fx-chip .dot{width:7px;height:7px;border-radius:50%;background:#4a4a63;flex:0 0 auto}
   .fx-chip.on .dot{background:#7c8aff}
   .fx-tag{font-size:9px;padding:1px 5px;border-radius:6px;background:#25253e;color:#8f95a8;font-weight:600}
-  /* Settings panel (level 3): the values of the selected effect */
-  .set-head{display:flex;align-items:flex-start;gap:10px}
-  .set-main{flex:1;min-width:0}
-  .set-name{font-size:13px;font-weight:600;color:#dcdcf0;display:flex;align-items:center;gap:6px}
-  .set-desc{font-size:11px;color:#8f95a8;margin-top:3px;line-height:1.45}
-  .set-why{font-size:10px;color:#c9a06a;margin-top:4px;line-height:1.45}
+  /* Settings panel (level 3): the settings themselves only; the name is already on the label above */
+  .set-desc{font-size:11px;color:#8f95a8;line-height:1.45;margin-bottom:4px}
+  .set-why{font-size:10px;color:#c9a06a;line-height:1.45;margin-bottom:4px}
+  .sw-state{font-size:11px;color:#8f95a8}
   .set-body{margin-top:10px;padding-top:10px;border-top:1px solid #25253e;
             display:flex;flex-direction:column;gap:10px}
   /* The switch is a button, so it is easy to tap (and to test) */
@@ -622,16 +620,21 @@ function renderSettings(){
   const def = effectDef(fx.id);
   const grey = !!(def && def.requires);
 
-  const head = el('div','set-head');
-  const main = el('div','set-main');
-  const nm = el('div','set-name');
-  nm.appendChild(document.createTextNode(def ? def.name : fx.id));
-  if(def && def.stage) nm.appendChild(el('span','fx-tag', def.stage));
-  main.appendChild(nm);
-  if(def && def.desc) main.appendChild(el('div','set-desc', def.desc));
-  if(grey) main.appendChild(el('div','set-why', plannedReason(def.requires) || 'Not supported by this engine yet'));
-  head.appendChild(main);
+  // The settings panel does NOT repeat the effect name (the label above shows it);
+  // and it ALWAYS shows the full set: on/off, strength and every section value,
+  // even while the effect is off, so values can be set up and saved in advance.
+  if(def && def.kind === 'bands' && (!fx.bands || !fx.bands.length)){
+    fx.mode = fx.mode || 'mid';
+    fx.bands = bandsFromStrength(def, fx.mode);   // untouched: seed the defaults so the panel is complete
+    syncCurType();
+  }
 
+  if(def && def.desc) box.appendChild(el('div','set-desc', def.desc));
+  if(grey) box.appendChild(el('div','set-why', plannedReason(def.requires) || 'Not supported by this engine yet'));
+
+  // On/off gets its own row: it is a setting too
+  const swRow = el('div','ctl');
+  swRow.appendChild(el('span','lb','On/off'));
   const sw = el('button','fx-sw' + (fx.enabled && !grey ? ' on' : ''));
   sw.setAttribute('aria-label', (def ? def.name : fx.id) + ' switch');
   if(grey) sw.disabled = true;
@@ -644,26 +647,12 @@ function renderSettings(){
     }
     dirty = true; syncCurType(); renderFx(); applyCurrent();
   });
-  head.appendChild(sw);
-
-  if(!grey){
-    const rm = el('button','fx-x','✕');
-    rm.title = 'Remove this effect from the type';
-    rm.setAttribute('aria-label','Remove ' + (def ? def.name : fx.id));
-    rm.addEventListener('click', function(){
-      const i = curEffects.findIndex(function(e){ return e.id === fx.id });
-      if(i >= 0) curEffects.splice(i,1);
-      if(selectedFx === fx.id) selectedFx = curEffects.length ? curEffects[0].id : '';
-      dirty = true; syncCurType(); renderFx(); applyCurrent();
-    });
-    head.appendChild(rm);
-  }
-  box.appendChild(head);
+  swRow.appendChild(sw);
+  swRow.appendChild(el('span','sw-state', fx.enabled ? 'on' : 'off'));
+  box.appendChild(swRow);
 
   if(grey){
-    box.appendChild(el('div','hint','This effect needs a newer engine (see the reason above); it cannot be adjusted yet.'));
-  } else if(!fx.enabled){
-    box.appendChild(el('div','hint','This effect is off; its values appear here once it is on.'));
+    box.appendChild(el('div','hint','This effect needs a newer engine, so it cannot be adjusted yet.'));
   } else {
     const body = el('div','set-body');
     const kind = def ? def.kind : '';
@@ -671,6 +660,18 @@ function renderSettings(){
     else if(kind === 'limiter') renderLimiterControls(body, fx);
     else body.appendChild(el('div','hint','This effect has no adjustable values yet'));
     box.appendChild(body);
+    if(!fx.enabled){
+      box.appendChild(el('div','hint','Currently off: the values above are saved into this type and take effect once it is on.'));
+    }
+    const rm = el('button','btn sm danger','✕ Remove this effect from the type');
+    rm.id = 'fx-remove';
+    rm.addEventListener('click', function(){
+      const i = curEffects.findIndex(function(e){ return e.id === fx.id });
+      if(i >= 0) curEffects.splice(i,1);
+      if(selectedFx === fx.id) selectedFx = curEffects.length ? curEffects[0].id : '';
+      dirty = true; syncCurType(); renderFx(); applyCurrent();
+    });
+    box.appendChild(rm);
   }
 }
 
