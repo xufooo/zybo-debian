@@ -11,18 +11,17 @@
        background:#0f0f1a;color:#e0e0e0;min-height:100vh;
        display:flex;justify-content:center;padding:12px;
        -webkit-tap-highlight-color:transparent}
-  .app{width:100%;max-width:420px;display:flex;flex-direction:column;gap:14px}
+  .app{width:100%;max-width:440px;display:flex;flex-direction:column;gap:14px}
 
   /* header */
   .header{text-align:center;padding:4px 0;
           font-size:13px;color:#9a9ab0;letter-spacing:2px;text-transform:uppercase}
   .header #app-ver{font-size:10px;letter-spacing:1px;color:#8f95a8}
-  /* Engine self-description: every "is this available" decision in the UI comes
-     from here instead of being hardcoded. */
+  /* Engine self-description: every "is this available" decision comes from here */
   .engine-line{text-align:center;font-size:10px;color:#7d8299;line-height:1.5}
   .engine-line b{color:#8f95a8;font-weight:600}
 
-  /* now-playing card */
+  /* now-playing */
   .card{background:#1a1a2e;border-radius:14px;padding:16px;text-align:center}
   .card .art{width:80px;height:80px;border-radius:12px;background:#25253e;
              margin:0 auto 12px;display:flex;align-items:center;justify-content:center;
@@ -43,15 +42,24 @@
   .src-btn.active{border-color:#7c8aff;color:#7c8aff;background:#1a1a3e}
   .src-btn:active{transform:scale(.96)}
   .src-btn:disabled{opacity:.35;cursor:not-allowed}
-  .src-btn:disabled:active{transform:none}
 
-  /* generic panels and titles */
+  /* generic */
   .section-title{font-size:11px;color:#9a9ab0;letter-spacing:3px;
                  text-transform:uppercase;text-align:center;margin-bottom:-6px}
   .panel{background:#1a1a2e;border-radius:14px;padding:14px 12px}
+  .hint{font-size:10px;color:#7d8299;line-height:1.5;margin-top:6px;text-align:center}
+  .row-wrap{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+  .btn{padding:8px 14px;min-height:32px;border-radius:8px;background:#25253e;
+       border:1px solid transparent;color:#999;font-size:11px;font-weight:600;
+       cursor:pointer;transition:all .15s}
+  .btn.active{border-color:#7c8aff;color:#7c8aff}
+  .btn:active{transform:scale(.96)}
+  .btn:disabled{opacity:.35;cursor:not-allowed}
+  .btn.primary{background:#2a2a4e;color:#a8b0ff}
+  .btn.danger:hover{border-color:#c4646e;color:#c4646e}
+  .btn.sm{padding:5px 9px;min-height:26px;font-size:10px}
 
-  /* Notice bar: whatever the backend says is shown verbatim
-     ("does not fit" / "not supported" is never dropped silently). */
+  /* Notice bar: whatever the backend says is shown verbatim, never swallowed */
   .notice{border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.5;
           background:#3a2530;color:#f0a8b4;border:1px solid #5c3540}
   .notice.warn{background:#3a3525;color:#e8cf9a;border-color:#5c5232}
@@ -59,118 +67,95 @@
   .notice .nt-h{font-weight:700;margin-bottom:3px}
   .notice ul{margin:4px 0 0 16px}
 
-  /* wizard */
-  .wiz-steps{display:flex;gap:6px;justify-content:center;margin-bottom:10px}
-  .wiz-dot{width:22px;height:22px;border-radius:50%;background:#25253e;color:#8f95a8;
-           font-size:11px;font-weight:700;display:flex;align-items:center;
-           justify-content:center;cursor:pointer;border:1px solid transparent}
-  .wiz-dot.active{background:#1a1a3e;color:#7c8aff;border-color:#7c8aff}
-  .wiz-dot.done{color:#9fd8b4}
-  .wiz-q{font-size:13px;color:#c9c9dc;margin-bottom:8px;text-align:center}
-  .wiz-opts{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
-  .wiz-actions{display:flex;gap:6px;justify-content:center;margin-top:12px}
-  .wiz-out{margin-top:10px;font-size:11px;color:#9a9ab0;line-height:1.6}
-  .wiz-out .ab{display:flex;gap:6px;justify-content:center;margin-top:8px}
-  .wiz-out .ab button{flex:1}
-
-  /* buttons */
-  .btn{padding:8px 14px;min-height:32px;border-radius:8px;background:#25253e;
-       border:1px solid transparent;color:#999;font-size:11px;font-weight:600;
-       cursor:pointer;transition:all .15s}
-  .btn.active{border-color:#7c8aff;color:#7c8aff}
-  .btn:active{transform:scale(.96)}
-  .btn:disabled{opacity:.35;cursor:not-allowed}
-  .btn:disabled:active{transform:none}
-  .btn.primary{background:#2a2a4e;color:#a8b0ff}
-  .btn.danger:hover{border-color:#c4646e;color:#c4646e}
-  .btn.sm{padding:5px 9px;min-height:26px;font-size:10px}
+  /* sound type */
+  .type-list{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+  .type-item{padding:8px 12px;min-height:34px;border-radius:9px;background:#25253e;
+             border:1px solid transparent;color:#c9c9dc;font-size:12px;font-weight:600;
+             cursor:pointer;display:flex;align-items:center;gap:5px}
+  .type-item.active{border-color:#7c8aff;color:#a8b0ff;background:#1a1a3e}
+  .type-item .mk{font-size:9px;color:#7d8299}
+  .type-item.active .mk{color:#8f95a8}
 
   /* effect cards */
-  .cards{display:flex;flex-direction:column;gap:8px}
-  .fx-card{background:#1a1a2e;border-radius:12px;padding:12px;
-           border:1px solid transparent;transition:border-color .15s}
-  .fx-card.on{border-color:#3d5a8a}
-  .fx-card.grey{opacity:.5}
+  .fx-list{display:flex;flex-direction:column;gap:8px}
+  .fx{background:#1a1a2e;border-radius:12px;padding:12px;border:1px solid transparent}
+  .fx.on{border-color:#3d5a8a}
+  .fx.grey{opacity:.5}
   .fx-head{display:flex;align-items:flex-start;gap:10px}
-  .fx-main{flex:1;min-width:0;cursor:pointer}
-  .fx-name{font-size:13px;font-weight:600;color:#dcdcf0;
-           display:flex;align-items:center;gap:6px}
-  .fx-tag{font-size:9px;padding:1px 5px;border-radius:6px;background:#25253e;
-          color:#8f95a8;font-weight:600}
+  .fx-main{flex:1;min-width:0}
+  .fx-name{font-size:13px;font-weight:600;color:#dcdcf0;display:flex;align-items:center;gap:6px}
+  .fx-tag{font-size:9px;padding:1px 5px;border-radius:6px;background:#25253e;color:#8f95a8;font-weight:600}
   .fx-desc{font-size:11px;color:#8f95a8;margin-top:3px;line-height:1.45}
   .fx-why{font-size:10px;color:#c9a06a;margin-top:4px;line-height:1.45}
-  /* Switch: a button rather than <input type=checkbox> so tests can click it. */
+  /* The switch is a button, so it is easy to tap (and to test) */
   .fx-sw{width:42px;height:24px;border-radius:12px;background:#25253e;border:none;
          position:relative;cursor:pointer;flex:0 0 auto;transition:background .15s}
   .fx-sw::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;
                 border-radius:50%;background:#8f95a8;transition:all .15s}
   .fx-sw.on{background:#3d5a8a}
   .fx-sw.on::after{left:21px;background:#fff}
-  .fx-cfg{margin-top:10px;padding-top:10px;border-top:1px solid #25253e;
-          display:flex;flex-direction:column;gap:8px}
-  .fx-cfg .strength{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-  .fx-cfg .strength .lb{font-size:10px;color:#8f95a8;margin-right:2px}
-  /* Parameter row (freq/gain/Q): shared by an expanded card and the chain editor. */
-  .param-row{display:flex;gap:6px;align-items:center}
-  .param-row .pf{flex:1.3;min-width:0}
-  .param-row .pg{flex:1.1;min-width:0}
-  .param-row .pq{flex:.9;min-width:0}
-  .param-row input[type=number]{width:100%;background:#25253e;border:1px solid #2f2f48;
-        border-radius:7px;color:#dcdcf0;font-size:11px;padding:6px 7px;
-        font-variant-numeric:tabular-nums}
-  .param-row input[type=number]:focus{outline:none;border-color:#7c8aff}
-  .param-row .unit{font-size:9px;color:#6f7590}
-  .chain-meta{font-size:10px;color:#8f95a8;text-align:center}
-  .chain-meta.over{color:#f0a8b4}
-  .chain-list{display:flex;flex-direction:column;gap:6px}
-  .chain-row{display:flex;gap:6px;align-items:center}
-  .chain-row .rm{flex:0 0 auto}
+  .fx-sw:disabled{cursor:not-allowed}
+  .fx-body{margin-top:10px;padding-top:10px;border-top:1px solid #25253e;
+           display:flex;flex-direction:column;gap:10px}
+  .fx-x{background:transparent;border:none;color:#7d8299;font-size:12px;
+        cursor:pointer;padding:2px 4px;border-radius:6px}
+  .fx-x:hover{color:#c4646e;background:#25253e}
 
-  /* presets */
-  .pst-list{display:flex;flex-wrap:wrap;gap:6px}
-  .pst-item{position:relative;display:flex;align-items:center;gap:6px;
-            background:#25253e;border-radius:9px;padding:7px 9px;
-            border:1px solid transparent}
+  /* One control row: label + slider + value */
+  .ctl{display:flex;align-items:center;gap:8px}
+  .ctl .lb{font-size:10px;color:#8f95a8;min-width:40px}
+  /* The slider ELEMENT must be 28px tall (that is the hit area); the thin track
+     is drawn by the track pseudo-element. It used to be height:6px -- visually
+     fine, but the hit area was only 6px, unusable on a phone (found by measuring, WCAG wants >=24px). */
+  .ctl input[type=range]{flex:1;height:28px;background:transparent;
+       -webkit-appearance:none;appearance:none;outline:none;min-width:0}
+  .ctl input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:#25253e}
+  .ctl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;
+       width:20px;height:20px;border-radius:50%;background:#fff;margin-top:-7px;
+       border:2px solid #7c8aff;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+  .ctl input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:#25253e}
+  .ctl input[type=range]::-moz-range-progress{height:6px;border-radius:3px;background:#7c8aff}
+  .ctl input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;
+       background:#fff;border:2px solid #7c8aff}
+  .ctl .val{font-size:10px;color:#a8b0ff;min-width:56px;text-align:right;
+            font-variant-numeric:tabular-nums}
+  .strength{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .strength .lb{font-size:10px;color:#8f95a8;margin-right:2px}
+
+  /* genre presets (secondary, collapsed by default) */
+  details.presets>summary{cursor:pointer;font-size:11px;color:#9a9ab0;
+        letter-spacing:3px;text-transform:uppercase;text-align:center;list-style:none}
+  details.presets>summary::-webkit-details-marker{display:none}
+  .pst-list{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:10px}
+  .pst-item{display:flex;align-items:center;gap:6px;background:#25253e;border-radius:9px;
+            padding:7px 9px;border:1px solid transparent}
   .pst-item.active{border-color:#7c8aff}
   .pst-item.grey{opacity:.5}
   .pst-item .nm{font-size:11px;font-weight:600;color:#c9c9dc;cursor:pointer;
-                max-width:150px;overflow:hidden;text-overflow:ellipsis;
-                white-space:nowrap}
+                max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .pst-item.active .nm{color:#a8b0ff}
   .pst-item .mini{font-size:9px;color:#7d8299}
-  .pst-item .acts{display:flex;gap:3px}
-  .pst-item .acts button{background:transparent;border:none;color:#7d8299;
-        font-size:11px;cursor:pointer;padding:2px 3px;border-radius:5px}
-  .pst-item .acts button:hover{color:#a8b0ff;background:#1a1a2e}
-  .pst-sec{font-size:10px;color:#7d8299;margin:8px 0 5px}
-  .pst-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:10px}
 
-  /* limiter */
+  /* volume / status / reboot */
   .vol-row{display:flex;align-items:center;gap:10px;padding:4px 8px}
   .vol-row .icon{font-size:22px}
-  .vol-row input[type=range]{flex:1;height:6px;border-radius:3px;background:#25253e;
+  /* Same for the volume slider: tall hit area, thin track */
+  .vol-row input[type=range]{flex:1;height:28px;background:transparent;
        -webkit-appearance:none;appearance:none;outline:none}
+  .vol-row input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:#25253e}
   .vol-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;
-       width:24px;height:24px;border-radius:50%;background:#fff;
-       border:2px solid #7c8aff;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+       width:24px;height:24px;border-radius:50%;background:#fff;border:2px solid #7c8aff;margin-top:-9px}
   .vol-row input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:#25253e}
   .vol-row input[type=range]::-moz-range-progress{height:6px;border-radius:3px;background:#7c8aff}
   .vol-row input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;
        background:#fff;border:2px solid #7c8aff}
   .vol-row .pct{font-size:14px;font-weight:600;color:#7c8aff;min-width:36px;text-align:right}
   .vol-row .db{font-size:11px;color:#8b8ba7;min-width:44px;text-align:right}
-  .row-wrap{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:8px}
-  .hint{font-size:10px;color:#7d8299;line-height:1.5;margin-top:6px;text-align:center}
-
-  /* status bar */
-  .status-bar{display:flex;justify-content:center;gap:16px;
-               font-size:10px;color:#8f95a8;padding:4px 0}
-  /* Reboot: kept at the very bottom and visually muted, so it is hard to hit by
-     accident -- rebooting during playback cuts the sound. */
+  .status-bar{display:flex;justify-content:center;gap:16px;font-size:10px;color:#8f95a8;padding:4px 0}
   .sys-row{display:flex;align-items:center;justify-content:center;gap:10px;
-             font-size:10px;color:#8f95a8;padding:6px 0 0}
-  .sys-btn{padding:5px 12px;border-radius:7px;background:transparent;
-             border:1px solid #3a3a55;color:#8f95a8;font-size:11px;cursor:pointer}
+           font-size:10px;color:#8f95a8;padding:6px 0 0}
+  .sys-btn{padding:5px 12px;border-radius:7px;background:transparent;border:1px solid #3a3a55;
+           color:#8f95a8;font-size:11px;cursor:pointer}
   .sys-btn:hover{border-color:#c4646e;color:#c4646e}
   .sys-btn:disabled{opacity:.5;cursor:default}
 </style>
@@ -182,7 +167,7 @@
   <div class="header">ZYBO Audio <span id="app-ver"></span></div>
   <div class="engine-line" id="engine-line"></div>
 
-  <!-- Now Playing ─────────────────────────────────────── -->
+  <!-- Now Playing -->
   <div class="card" id="now-playing">
     <div class="art" id="art">🎵</div>
     <div class="title" id="np-title">Not playing</div>
@@ -190,74 +175,49 @@
     <div><span class="source-badge" id="source-badge">Idle</span></div>
   </div>
 
-  <!-- Source Selector ─────────────────────────────────── -->
+  <!-- Source -->
   <div class="source-row" id="source-row">
-    <button class="src-btn active" data-src="idle"     id="src-idle">🛑 Stop</button>
-    <button class="src-btn"         data-src="airplay"  id="src-airplay">📱 AirPlay</button>
-    <button class="src-btn"         data-src="dlna"      id="src-dlna">🏠 DLNA</button>
-    <button class="src-btn"         data-src="bluetooth" id="src-bt">🎧 Bluetooth</button>
+    <button class="src-btn active" data-src="idle"      id="src-idle">🛑 Stop</button>
+    <button class="src-btn"        data-src="airplay"   id="src-airplay">📱 AirPlay</button>
+    <button class="src-btn"        data-src="dlna"      id="src-dlna">🏠 DLNA</button>
+    <button class="src-btn"        data-src="bluetooth" id="src-bt">🎧 Bluetooth</button>
   </div>
 
-  <!-- Notice bar: errors and warnings appear here instead of alert()
-       (alert() would swallow the text under jsdom). -->
   <div class="notice" id="notice" hidden></div>
 
-  <!-- Wizard ──────────────────────────────────────────── -->
-  <div class="section-title">Sound wizard</div>
-  <div class="panel" id="wizard">
-    <div class="wiz-steps" id="wiz-dots"></div>
-    <div class="wiz-q" id="wiz-q"></div>
-    <div class="wiz-opts" id="wiz-opts"></div>
-    <div class="wiz-actions" id="wiz-actions"></div>
-    <div class="wiz-out" id="wiz-out"></div>
+  <!-- Sound type -->
+  <div class="section-title">Sound type</div>
+  <div class="panel">
+    <div class="type-list" id="type-list"></div>
+    <div class="row-wrap" id="type-actions"></div>
+    <div class="hint" id="type-hint"></div>
   </div>
 
-  <!-- Effect cards ────────────────────────────────────── -->
+  <!-- Effects: this type's own set of cards -->
   <div class="section-title">Effects</div>
-  <div class="cards" id="cards"></div>
-
-  <!-- Current chain (editable; a card just adds its curve's bands here) ── -->
-  <div class="section-title">Current chain</div>
-  <div class="panel">
-    <div class="chain-meta" id="chain-meta"></div>
-    <div class="chain-list" id="chain-list"></div>
-    <div class="row-wrap">
-      <button class="btn sm" id="btn-add-band">＋ Add a band</button>
-      <button class="btn sm" id="btn-chain-clear">Clear (flat)</button>
-    </div>
+  <div class="fx-list" id="fx-list"></div>
+  <div class="panel" style="margin-top:8px">
+    <div class="row-wrap" style="margin-top:0" id="fx-actions"></div>
+    <div class="hint" id="fx-hint"></div>
   </div>
 
-  <!-- Presets ─────────────────────────────────────────── -->
-  <div class="section-title">Presets</div>
-  <div class="panel">
-    <div class="pst-list" id="preset-list"></div>
-    <div class="pst-row">
-      <button class="btn" id="btn-save-preset">💾 Save as my preset</button>
-      <button class="btn" id="btn-import" title="Import a custom JSON preset, REW text or AutoEQ text">📥 Import</button>
-      <a class="btn" id="btn-export-rew" href="/api/dsp/export?format=rew" download
-         style="text-decoration:none;display:inline-flex;align-items:center">📤 Export EQ (REW)</a>
-      <input type="file" id="file-import" accept=".txt,.json" style="display:none">
+  <!-- Genre presets (secondary) -->
+  <details class="presets">
+    <summary>Genre presets</summary>
+    <div class="panel" style="margin-top:10px">
+      <div class="pst-list" id="preset-list"></div>
+      <div class="row-wrap">
+        <button class="btn" id="btn-save-preset">💾 Save preset</button>
+        <button class="btn" id="btn-import" title="Import a custom JSON preset, REW text or AutoEQ text">📥 Import</button>
+        <a class="btn" id="btn-export-rew" href="/api/dsp/export?format=rew" download
+           style="text-decoration:none;display:inline-flex;align-items:center">📤 Export EQ (REW)</a>
+        <input type="file" id="file-import" accept=".txt,.json" style="display:none">
+      </div>
+      <div class="hint" id="preset-hint"></div>
     </div>
-    <div class="hint" id="preset-hint"></div>
-  </div>
+  </details>
 
-  <!-- Limiter ─────────────────────────────────────────── -->
-  <div class="section-title">Limiter (clip protection)</div>
-  <div class="panel">
-    <div class="row-wrap" style="margin-top:0">
-      <button class="btn" id="lim-toggle">Limiter off</button>
-      <button class="btn" id="lim-mode-feedback">Legacy (no lookahead)</button>
-      <button class="btn" id="lim-mode-truepeak">True-peak (lookahead)</button>
-    </div>
-    <div class="vol-row" style="margin-top:8px">
-      <span class="icon">🎚️</span>
-      <input type="range" id="lim-thr" min="-24" max="0" value="-1" step="0.5">
-      <span class="pct" id="lim-thr-val">-1.0 dBFS</span>
-    </div>
-    <div class="hint" id="lim-hint"></div>
-  </div>
-
-  <!-- Volume ──────────────────────────────────────────── -->
+  <!-- Volume -->
   <div class="section-title">Volume</div>
   <div class="vol-row">
     <span class="icon">🔈</span>
@@ -267,14 +227,12 @@
     <span class="db" id="vol-db">--</span>
   </div>
 
-  <!-- System Status ───────────────────────────────────── -->
   <div class="status-bar" id="status-bar">
     <span>CPU <span id="sys-cpu">--</span>%</span>
     <span>RAM <span id="sys-ram">--</span>MB</span>
     <span>Uptime <span id="sys-uptime">--</span></span>
   </div>
 
-  <!-- System actions ──────────────────────────────────── -->
   <div class="sys-row">
     <button class="sys-btn" id="btn-reboot">Reboot</button>
     <span id="sys-note"></span>
@@ -284,92 +242,82 @@
 
 <script>
 // ════════════════════════════════════════════════════════════════════════
-// Panel layout
+// Panel layout (0.2 second revision: no wizard, just "sound type -> effect cards -> values")
 //
-//   wizard → effect cards → current chain → presets → limiter → volume/status
+//   sound type (headphones / small speakers / amp / custom)
+//     +-- this type's OWN set of effect cards (types can differ completely:
+//         headphones may have 3, the amp may have only "Limiter protection")
+//           +-- each card expands to its own controls (sliders / buttons)
 //
-// Three rules run through the whole file:
+// Three rules run through this file:
 //
-// 1. The HARDWARE decides what is available. The page first reads
-//    /api/dsp/capabilities: the band limit, whether a true-peak limiter exists
-//    and which effect types are still planned all come from there. Nothing is
-//    hardcoded to "6 bands" or "both limiter modes exist" -- those change
-//    between bitstream generations.
-// 2. If it does not fit, say so. Going over the band limit is never silently
-//    truncated: the backend's own message is shown verbatim (it names which
-//    bands were dropped), and the UI only relays it.
-// 3. A card is not the chain. A card is a shortcut that adds its curve's bands
-//    to the current chain, and whether it looks "on" is DERIVED by matching the
-//    chain. The other way round (card state as the source of truth) would lie
-//    after applying a preset: the preset changes the chain while the cards
-//    still show the old state. The single source of truth is the current chain.
+// 1. The HARDWARE decides what is available: band limit, whether a true-peak
+//    limiter exists, which effects are still planned -- all read from capabilities.
+// 2. If it does not fit, say so: the backend's own message is shown, never truncated.
+// 3. Card controls are driven by the effect catalog below: each card declares its kind
+//    and the renderer draws it. Adding a new effect = one catalog entry, one kind branch;
+//    no layout work and no backend change (a type is a generic container).
 // ════════════════════════════════════════════════════════════════════════
 
-// ── State ─────────────────────────────────────────────────────────────
-let state = {
-  source: 'idle', title:'', artist:'', album:'', playing:false, volume:80, volume_db:-12,
-  dsp:{ enabled:true, bypass:false, preset:'flat', bands:[] },
-  system:{ cpu_percent:0, mem_used_mb:0, uptime_sec:0 }
-};
-let caps = null;        // /api/dsp/capabilities (hardware self-description)
-let chain = [];         // current chain (the single source of truth, see rule 3)
-let presets = [];       // preset list (built-in + user)
-let cardCfg = {};       // per-card strength: {cardId:'light'|'mid'|'strong'}
-let wizard = { step:1, device:'small', goals:[], strength:'mid', generated:null };
-let abChain = null;     // A side of the A/B comparison (the chain before generating)
-let abSide = '';        // '' | 'A' | 'B'
-const API = '';
-
-// Strength step -> base gain in dB. Each band of a card scales this by its weight.
-const STRENGTH_DB = { light: 2, mid: 4, strong: 6 };
-const STRENGTH_LABEL = { light:'Light', mid:'Medium', strong:'Strong' };
-
-// Effect cards: five that the current engine can do, plus two planned ones (greyed).
-// bands[].g is the weight relative to the strength step: 1.0 = that step's base dB.
-const CARDS = [
-  { id:'bass',    name:'Deep bass',    desc:'Hear the low end even at low volume', stage:'P0',
+// -- Effect catalog (data driven: adding an effect only touches this table) --
+// kind：
+//   'bands'   - built from biquad sections (strength step x weight = section gain)
+//   'limiter' - the limiter stage at the end of the chain (on/off, mode, threshold)
+// Entries with only `requires` need a newer engine; the UI greys them out and says why.
+const EFFECTS = [
+  { id:'bass',    name:'Deep bass',   desc:'Hear the low end even at low volume', stage:'P0', kind:'bands',
     bands:[{freq:60,q:0.7,g:1.0},{freq:150,q:0.8,g:0.7}] },
-  { id:'vocal',   name:'Clear vocals', desc:'Voices and dialogue step out of the mix', stage:'P0',
+  { id:'vocal',   name:'Clear vocals',   desc:'Voices and dialogue step out of the mix', stage:'P0', kind:'bands',
     bands:[{freq:400,q:0.8,g:-0.5},{freq:1000,q:1.0,g:0.9},{freq:3000,q:1.0,g:1.0}] },
-  { id:'vocalhd', name:'Detailed vocals', desc:'Brighter lead voices', stage:'P0',
+  { id:'vocalhd', name:'Detailed vocals', desc:'Brighter lead voices', stage:'P0', kind:'bands',
     bands:[{freq:400,q:0.8,g:-0.5},{freq:1000,q:1.0,g:0.8},{freq:3000,q:1.2,g:1.0},
            {freq:6000,q:1.0,g:0.6}] },
-  { id:'soft',    name:'Easy listening', desc:'Tame harsh treble, comfortable for hours', stage:'P0',
+  { id:'soft',    name:'Easy listening',   desc:'Tame harsh treble, comfortable for hours', stage:'P0', kind:'bands',
     bands:[{freq:3000,q:1.0,g:-0.7},{freq:10000,q:0.8,g:-1.0}] },
-  { id:'night',   name:'Late-night',   desc:'Stay intelligible at low volume', stage:'P0',
+  { id:'night',   name:'Late-night', desc:'Stay intelligible at low volume', stage:'P0', kind:'bands',
     bands:[{freq:60,q:0.7,g:0.8},{freq:150,q:0.8,g:0.6},{freq:3000,q:1.0,g:-0.3},
            {freq:10000,q:0.8,g:0.5}] },
-  // Planned: the reason text for `requires` comes from the backend's
-  // capabilities.planned map and is shown as-is.
+  { id:'limiter', name:'Limiter protection',   desc:'Prevents clipping and pops', stage:'P0', kind:'limiter' },
+  // Planned: the reason comes from capabilities.planned and is shown as-is
   { id:'spatial', name:'3D / headphone stage', desc:'Move the image from inside your head to in front',
     stage:'P2', requires:['crossfeed'] },
-  { id:'widener', name:'Stereo widening', desc:'Wider, more enveloping image',
+  { id:'widener', name:'Stereo widening',   desc:'Wider, more enveloping image',
     stage:'P2', requires:['widener'] },
 ];
 
-// Wizard step 2: what would you like to improve (multi-select, up to 3).
-const GOALS = [
-  { id:'bass',   label:'More bass',      bands:[{freq:60,q:0.7,g:1.0},{freq:150,q:0.8,g:0.7}] },
-  { id:'muddy',  label:'Bass too muddy', bands:[{freq:150,q:1.0,g:-0.6},{freq:400,q:1.0,g:-0.8}] },
-  { id:'vocal',  label:'Unclear vocals', bands:[{freq:400,q:0.8,g:-0.5},{freq:1000,q:1.0,g:0.9},
-                                          {freq:3000,q:1.0,g:1.0}] },
-  { id:'harsh',  label:'Harsh treble',   bands:[{freq:3000,q:1.0,g:-0.7},{freq:10000,q:0.8,g:-1.0}] },
-  { id:'dull',   label:'Dull treble',    bands:[{freq:6000,q:1.0,g:0.8},{freq:10000,q:0.8,g:1.0}] },
-  { id:'quiet',  label:'Quiet listening', bands:[{freq:60,q:0.7,g:0.8},{freq:150,q:0.8,g:0.6},
-                                          {freq:3000,q:1.0,g:-0.3},{freq:10000,q:0.8,g:0.5}] },
-  { id:'warm',   label:'Warmer sound',   bands:[{freq:200,q:0.8,g:0.7},{freq:3000,q:1.0,g:-0.5}] },
-];
-// Wizard step 1: headphones need more low-end compensation than speakers.
-const DEVICES = [
-  { id:'headphone', label:'Headphones',  scale:0.8, hint:'In-ear / over-ear' },
-  { id:'small',     label:'Small speakers', scale:1.0, hint:'Desktop / Bluetooth' },
-  { id:'big',       label:'Big speakers / amp', scale:1.2, hint:'Living room / floor-standing' },
-];
+const STRENGTH_DB = { light: 2, mid: 4, strong: 6 };
+const STRENGTH_LABEL = { light:'Light', mid:'Medium', strong:'Strong' };
 
-// Default frequencies for "add a band"; the real limit is caps.bands.
-const DEFAULT_FREQS = [60,150,400,1000,3000,10000];
+// -- Parameter ranges (match the backend clamp; never offer a value it would clamp) --
+const FREQ_MIN = 60, FREQ_MAX = 20000, GAIN_LIM = 24, Q_MIN = 0.1, Q_MAX = 10;
+const SLIDER_STEPS = 1000;
+// Frequency and Q use a LOG scale: spread linearly, 60..20000 squeezes all bass to one end.
+const freqFromSlider = v => FREQ_MIN * Math.pow(FREQ_MAX / FREQ_MIN, v / SLIDER_STEPS);
+const sliderFromFreq = f => SLIDER_STEPS * Math.log(f / FREQ_MIN) / Math.log(FREQ_MAX / FREQ_MIN);
+const qFromSlider    = v => Q_MIN * Math.pow(Q_MAX / Q_MIN, v / SLIDER_STEPS);
+const sliderFromQ    = q => SLIDER_STEPS * Math.log(q / Q_MIN) / Math.log(Q_MAX / Q_MIN);
 
-// ── DOM helpers ───────────────────────────────────────────────────────
+// ── State ─────────────────────────────────────────────────────────────
+let state = {};          // /api/status
+let caps = null;         // /api/dsp/capabilities
+let types = [];          // /api/dsp/types
+let curName = '';        // currently selected type
+let curEffects = [];     // that type's cards (working copy)
+let presets = [];        // genre presets
+// dirty: has the user actually CHANGED this type's settings?
+// Merely looking at a built-in type must not write it to disk, otherwise
+// tapping "Headphones" creates a same-named user type that shadows the built-in one.
+let dirty = false;
+const API = '';
+
+const SRC_LABEL = { airplay:'AirPlay', bluetooth:'Bluetooth', dlna:'DLNA' };
+const SRC_HINT = {
+  airplay:   'Cast to ZYBO Audio from your phone',
+  bluetooth: 'Pair ZYBO Audio from your phone',
+  dlna:      'Waiting for a push',
+};
+
+// -- Small DOM helpers --
 function $(id){ return document.getElementById(id) }
 function setText(id,t){ const e=$(id); if(e)e.textContent=t }
 function el(tag, cls, text){
@@ -378,20 +326,9 @@ function el(tag, cls, text){
   if(text !== undefined && text !== null) e.textContent = text;
   return e;
 }
-// Source display names plus a hint on how to start that source.
-// Do NOT say "connected": the backend only knows which source is SELECTED, not
-// whether a phone has actually connected (only state.playing means audio is
-// flowing -- see systemIsPlaying in the backend). The subtitle used to claim
-// "airplay connected" from the selection alone, while the title claimed
-// "No source connected" whenever nothing was playing: the two contradicted.
-const SRC_LABEL = { airplay:'AirPlay', bluetooth:'Bluetooth', dlna:'DLNA' };
-const SRC_HINT = {
-  airplay:   'Cast to ZYBO Audio from your phone',
-  bluetooth: 'Pair ZYBO Audio from your phone',
-  dlna:      'Waiting for a push',
-};
+function effectDef(id){ return EFFECTS.find(function(e){ return e.id === id }) }
 
-// ── Notice bar (the only error outlet) ────────────────────────────────
+// -- Notice bar (the only error outlet; no alert(), jsdom would swallow it) --
 let noticeTimer = null;
 function showNotice(msg, kind, details){
   const n = $('notice');
@@ -406,391 +343,519 @@ function showNotice(msg, kind, details){
     n.appendChild(ul);
   }
   if(noticeTimer) clearTimeout(noticeTimer);
-  // Success notices fade out on their own; errors stay until they are read.
-  if(kind === 'ok') noticeTimer = setTimeout(clearNotice, 4000);
+  if(kind === 'ok') noticeTimer = setTimeout(clearNotice, 4000);   // success fades, errors stay
 }
-function clearNotice(){ const n = $('notice'); if(n){ n.hidden = true; n.innerHTML = '' } }
-function fmtDB(db, pct){
-  if(pct <= 0) return 'Muted';
-  return (db > 0 ? '+' : '') + db.toFixed(0) + ' dB';
-}
+function clearNotice(){ const n = $('notice'); if(n){ n.hidden = true; n.innerHTML='' } }
 
-// ── HTTP: surface the backend's own message (errors are {"error": "..."}) ──
+// -- HTTP: surface the backend's own message (errors are {"error":"..."}) --
 async function api(path, opts){
   const r = await fetch(API + path, opts);
   const text = await r.text();
   let body = null;
   try { body = text ? JSON.parse(text) : null } catch(e){}
   if(!r.ok){
-    const msg = (body && body.error) ? body.error : ('HTTP ' + r.status);
-    const err = new Error(msg);
+    const err = new Error((body && body.error) ? body.error : ('HTTP ' + r.status));
     err.status = r.status;
-    err.body = body;
     throw err;
   }
   return body;
 }
 function postJSON(path, obj, method){
-  return api(path, {
-    method: method || 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(obj)
-  });
+  return api(path, { method: method || 'POST',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify(obj) });
 }
 
-// ── Capabilities → UI ─────────────────────────────────────────────────
-function maxBands(){
-  // Band limit: the chain model is capped (6 bands), while the engine's own
-  // storage is larger. The backend reports `bands` honestly and the UI only
-  // uses that number instead of hardcoding one.
-  return (caps && caps.bands) ? caps.bands : 6;
-}
-function truepeakAvailable(){
-  return !!(caps && caps.limiter && caps.limiter.truepeak_available);
-}
+// -- Capabilities -> UI --
+function maxBands(){ return (caps && caps.bands) ? caps.bands : 6 }
+function truepeakAvailable(){ return !!(caps && caps.limiter && caps.limiter.truepeak_available) }
 function plannedReason(requires){
   if(!requires || !caps || !caps.planned) return '';
   const out = [];
-  requires.forEach(function(t){
-    const why = caps.planned[t];
-    if(why) out.push(why);
-  });
-  return out.join('; ');
+  requires.forEach(function(t){ const why = caps.planned[t]; if(why) out.push(why) });
+  return out.join('；');
 }
 function renderEngineLine(){
   const line = $('engine-line');
   if(!line) return;
-  if(!caps){ line.textContent = 'Reading engine capabilities…'; return }
-  const parts = [];
-  parts.push(caps.engine === 'slot-table' ? 'slot-table engine' : 'fixed 6-band');
-  parts.push('up to ' + caps.bands + ' bands');
-  parts.push(truepeakAvailable() ? 'true-peak limiter available' : 'no true-peak limiter');
+  if(!caps){ line.textContent = 'Reading engine capabilities...'; return }
+  const parts = [ caps.engine === 'slot-table' ? 'slot-table engine' : 'fixed 6-band',
+                  'up to ' + caps.bands + ' bands',
+                  truepeakAvailable() ? 'true-peak limiter available' : 'no true-peak limiter' ];
   if(caps.dsp_available === false) parts.push('DSP unavailable');
   line.innerHTML = '';
-  line.appendChild(el('b', null, 'Engine: '));
+  line.appendChild(el('b','Engine: '));
   line.appendChild(document.createTextNode(parts.join(' · ')));
 }
-
 async function loadCaps(){
-  try {
-    caps = await api('/api/dsp/capabilities');
-  } catch(e){
-    caps = null;
-    showNotice('Cannot read engine capabilities (/api/dsp/capabilities): ' + e.message);
-  }
+  try { caps = await api('/api/dsp/capabilities') }
+  catch(e){ caps = null; showNotice('Cannot read engine capabilities: ' + e.message) }
   renderEngineLine();
 }
 
-// ── Current chain ─────────────────────────────────────────────────────
-// The input ranges below match the backend's own clamping
-// (60 Hz / 0.1 Q / +/-24 dB / 20 kHz). The backend sanitizes silently, so if
-// the UI allowed 20 Hz the display would say 20 while the hardware ran 60.
-const FREQ_MIN = 60, FREQ_MAX = 20000, GAIN_LIM = 24, Q_MIN = 0.1, Q_MAX = 10;
-
-function chainInputFocused(){
-  const a = document.activeElement;
-  return !!(a && a.closest && a.closest('#chain-list'));
-}
-function cardsInputFocused(){
-  const a = document.activeElement;
-  return !!(a && a.closest && a.closest('#cards'));
-}
-
-async function loadChain(force){
+// -- Sound types --
+async function loadTypes(){
   try {
-    const d = await api('/api/dsp/chain');
-    chain = (d.chain || []).map(function(it){
-      return { type: it.type || 'peq', enabled: it.enabled !== false,
-               freq: +it.freq || 1000, gain_db: +it.gain_db || 0, q: +it.q || 1 };
-    });
-    // Do not interrupt someone who is typing: never rebuild the whole DOM
-    // underneath an input that currently has focus.
-    if(force || !chainInputFocused()) renderChain();
-    if(force || !cardsInputFocused()) renderCards();
-    renderPresets();   // the preset highlight is derived from the chain
+    const d = await api('/api/dsp/types');
+    types = d.types || [];
+    BUILTIN_NAMES = d.builtin_names || [];
   } catch(e){
-    showNotice('Cannot read the current chain: ' + e.message);
+    types = [];
+    showNotice('Cannot read sound types: ' + e.message);
   }
 }
+function curType(){ return types.find(function(t){ return t.name === curName }) }
+// The built-in type names come FROM THE BACKEND (builtin_names in GET /api/dsp/types);
+// they are not hardcoded here -- a name is backend data and the UI only relays it.
+// Once a user edits one it shows up as a same-named user type, so "restore built-in" is offered.
+let BUILTIN_NAMES = [];
 
-let chainTimer = null;
-function pushChain(){
-  if(chainTimer) clearTimeout(chainTimer);
-  chainTimer = setTimeout(function(){ applyChainNow() }, 150);
-}
-async function applyChainNow(){
-  const items = chain
-    .filter(function(it){ return it.enabled !== false })
-    .map(function(it){
-      return { type: it.type || 'peq', enabled: true,
-               freq: +it.freq, gain_db: +it.gain_db, q: +it.q };
-    });
-  try {
-    const d = await postJSON('/api/dsp/chain', { chain: items }, 'PUT');
-    renderPresets();   // highlight is derived: once the chain changes it follows
-    if(d && typeof d.preamp_db === 'number' && d.preamp_db < -0.05){
-      // The backend applied this headroom itself to avoid clipping; say so,
-      // the user is entitled to know.
-      showNotice('Applied (' + d.applied + ' bands). Overall level reduced by ' +
-                 Math.abs(d.preamp_db).toFixed(1) + ' dB to avoid clipping', 'ok');
-    }
-    // Read back once: the backend clamps out-of-range values (see FREQ_MIN
-    // above), and this shows what actually took effect.
-    if(!chainInputFocused()) await loadChain();
-  } catch(e){
-    // Does not fit / unsupported band: show the backend's own message rather
-    // than truncating silently.
-    showNotice('This chain was not applied', 'err', [e.message]);
-  }
+// Deep-copy effects into a working copy (never mutate the objects inside `types`)
+function cloneEffects(list){
+  return (list || []).map(function(e){
+    return { id:e.id, enabled:!!e.enabled, mode:e.mode || '',
+             params: Object.assign({}, e.params || {}),
+             bands: (e.bands || []).map(function(b){
+               return { type:b.type || 'peq', enabled:true,
+                        freq:+b.freq, gain_db:+b.gain_db, q:+b.q };
+             }) };
+  });
 }
 
-// ── Effect cards ──────────────────────────────────────────────────────
-// A card looks "on" when every one of its bands is present in the current
-// chain (matched by frequency, 5% tolerance).
-function cardMatches(card){
-  if(!card.bands) return [];
-  const hits = [];
-  card.bands.forEach(function(b){
-    const tol = Math.max(3, b.freq * 0.05);
-    const found = chain.find(function(it){
-      return it.enabled !== false && Math.abs(it.freq - b.freq) <= tol;
-    });
-    hits.push(found || null);
-  });
-  return hits;
-}
-function cardOn(card){
-  const hits = cardMatches(card);
-  return hits.length > 0 && hits.every(function(h){ return !!h });
-}
-function cardStrengthNow(card){
-  // Derive the strength step from the gains actually in the chain. A card does
-  // not remember "which step I think I am", otherwise it would report a step
-  // unrelated to the chain after a preset was applied.
-  const hits = cardMatches(card);
-  const base = card.bands.filter(function(b){ return b.g > 0 });
-  if(!base.length) return cardCfg[card.id] || 'mid';
-  const b0 = base[0];
-  const h = hits[card.bands.indexOf(b0)];
-  if(!h) return cardCfg[card.id] || 'mid';
-  const db = h.gain_db / b0.g;
-  let best = 'mid', bestDiff = 99;
-  Object.keys(STRENGTH_DB).forEach(function(k){
-    const diff = Math.abs(STRENGTH_DB[k] - db);
-    if(diff < bestDiff){ bestDiff = diff; best = k }
-  });
-  return best;
-}
-function renderCards(){
-  const box = $('cards');
+function renderTypes(){
+  const box = $('type-list');
   if(!box) return;
   box.innerHTML = '';
-  CARDS.forEach(function(card){
-    const grey = !!card.requires;
-    const on = cardOn(card);
-    const div = el('div', 'fx-card' + (on ? ' on' : '') + (grey ? ' grey' : ''));
-    div.dataset.card = card.id;
+  types.forEach(function(t){
+    const b = el('div','type-item' + (t.name === curName ? ' active' : ''));
+    b.dataset.type = t.name;
+    b.appendChild(document.createTextNode(t.name));
+    b.appendChild(el('span','mk', t.builtin ? 'built-in' : 'mine'));
+    b.addEventListener('click', function(){ selectType(t.name) });
+    box.appendChild(b);
+  });
+  if(!types.length) box.appendChild(el('div','hint','No sound types yet'));
+
+  const acts = $('type-actions');
+  if(acts){
+    acts.innerHTML = '';
+    const add = el('button','btn sm primary','+ New type');
+    add.id = 'type-new';
+    add.addEventListener('click', newType);
+    acts.appendChild(add);
+
+    const t = curType();
+    if(t){
+      const copy = el('button','btn sm','Copy');
+      copy.id = 'type-copy';
+      copy.addEventListener('click', copyType);
+      acts.appendChild(copy);
+
+      if(!t.builtin){
+        const ren = el('button','btn sm','Rename');
+        ren.id = 'type-rename';
+        ren.addEventListener('click', renameType);
+        acts.appendChild(ren);
+
+        const del = el('button','btn sm danger','Delete');
+        del.id = 'type-delete';
+        del.addEventListener('click', deleteType);
+        acts.appendChild(del);
+      }
+      if(!t.builtin && BUILTIN_NAMES.indexOf(t.name) >= 0){
+        const rst = el('button','btn sm','Restore built-in');
+        rst.id = 'type-restore';
+        rst.addEventListener('click', restoreBuiltin);
+        acts.appendChild(rst);
+      }
+    }
+  }
+  const hint = $('type-hint');
+  if(hint){
+    hint.textContent = curName
+      ? ('Type "' + curName + '" has ' + curEffects.length +
+         ' effect card(s); switching type swaps the whole set, and edits are remembered.')
+      : 'Pick a sound type first.';
+  }
+}
+
+async function selectType(name){
+  const t = types.find(function(x){ return x.name === name });
+  if(!t) return;
+  curName = name;
+  curEffects = cloneEffects(t.effects);
+  dirty = false;        // just looking: apply its settings, do not save
+  renderTypes(); renderCards();
+  await applyNow();     // switching type swaps everything: push it now
+}
+
+// working copy -> the in-memory types entry (the visible content must follow)
+function syncCurType(){
+  const t = curType();
+  if(t) t.effects = cloneEffects(curEffects);
+}
+
+async function newType(){
+  const name = (window.prompt && window.prompt('Name for the new type?', 'My device')) || '';
+  if(!name.trim()) return;
+  if(types.some(function(t){ return t.name === name.trim() })){
+    showNotice('A type with that name already exists', 'warn', ['Pick another name, or select it and edit that one.']);
+    return;
+  }
+  types.push({ name:name.trim(), note:'', builtin:false, effects: cloneEffects(curEffects) });
+  curName = name.trim();
+  renderTypes(); renderCards(); await applyNow();
+  showNotice('Created type "' + curName + '" (copied from the current one)', 'ok');
+}
+
+async function copyType(){
+  const name = (window.prompt && window.prompt('Copy as?', curName + ' 2')) || '';
+  if(!name.trim()) return;
+  if(types.some(function(t){ return t.name === name.trim() })){
+    showNotice('A type with that name already exists', 'warn', []);
+    return;
+  }
+  types.push({ name:name.trim(), note:'', builtin:false, effects: cloneEffects(curEffects) });
+  curName = name.trim();
+  renderTypes(); renderCards(); await applyNow();
+  showNotice('Copied to "' + curName + '"', 'ok');
+}
+
+async function renameType(){
+  const t = curType();
+  if(!t || t.builtin) return;
+  const to = (window.prompt && window.prompt('New name?', t.name)) || '';
+  if(!to.trim() || to.trim() === t.name) return;
+  try {
+    await postJSON('/api/dsp/types/rename', { from:t.name, to:to.trim() });
+    await loadTypes();
+    curName = to.trim();
+    curEffects = cloneEffects(curType() ? curType().effects : []);
+    renderTypes(); renderCards();
+    showNotice('Renamed to "' + curName + '"', 'ok');
+  } catch(e){ showNotice('Rename failed', 'err', [e.message]) }
+}
+
+async function deleteType(){
+  const t = curType();
+  if(!t || t.builtin) return;
+  if(!(window.confirm && window.confirm('Delete the type "' + t.name + '"?'))) return;
+  try {
+    await postJSON('/api/dsp/types/delete', { name:t.name });
+    await loadTypes();
+    curName = types.length ? types[0].name : '';
+    curEffects = cloneEffects(curType() ? curType().effects : []);
+    renderTypes(); renderCards(); await applyNow();
+    showNotice('Deleted', 'ok');
+  } catch(e){ showNotice('Delete failed', 'err', [e.message]) }
+}
+
+// "Restore built-in" = delete the same-named user type so the built-in one shows again
+async function restoreBuiltin(){
+  const t = curType();
+  if(!t || t.builtin) return;
+  if(!(window.confirm && window.confirm('Restore "' + t.name + '" to its built-in settings? Your changes are lost.'))) return;
+  try {
+    await postJSON('/api/dsp/types/delete', { name:t.name });
+    await loadTypes();
+    const back = types.find(function(x){ return x.name === t.name });
+    curEffects = cloneEffects(back ? back.effects : []);
+    renderTypes(); renderCards(); await applyNow();
+    showNotice('Restored the built-in settings', 'ok');
+  } catch(e){ showNotice('Restore failed', 'err', [e.message]) }
+}
+
+// -- Effect cards --
+function fxState(id){ return curEffects.find(function(e){ return e.id === id }) }
+
+function renderCards(){
+  const box = $('fx-list');
+  if(!box) return;
+  box.innerHTML = '';
+  curEffects.forEach(function(fx, idx){
+    const def = effectDef(fx.id);
+    const grey = !!(def && def.requires);
+    const div = el('div','fx' + (fx.enabled && !grey ? ' on' : '') + (grey ? ' grey' : ''));
+    div.dataset.fx = fx.id;
 
     const head = el('div','fx-head');
     const main = el('div','fx-main');
     const nm = el('div','fx-name');
-    nm.appendChild(document.createTextNode(card.name));
-    nm.appendChild(el('span','fx-tag', card.stage));
+    nm.appendChild(document.createTextNode(def ? def.name : fx.id));
+    if(def && def.stage) nm.appendChild(el('span','fx-tag', def.stage));
     main.appendChild(nm);
-    main.appendChild(el('div','fx-desc', card.desc));
-    if(grey){
-      const why = plannedReason(card.requires);
-      main.appendChild(el('div','fx-why', why || 'Not supported by this engine yet'));
-    }
-    // Tapping the body expands/collapses the parameters; it does not change the
-    // chain (avoids accidental edits).
-    main.addEventListener('click', function(){
-      if(grey) return;
-      div.classList.toggle('open');
-      renderCards();
-    });
+    if(def && def.desc) main.appendChild(el('div','fx-desc', def.desc));
+    if(grey) main.appendChild(el('div','fx-why', plannedReason(def.requires) || 'Not supported by this engine yet'));
     head.appendChild(main);
 
-    const sw = el('button','fx-sw' + (on ? ' on' : ''));
-    sw.setAttribute('aria-label', card.name);
+    if(!grey){
+      const rm = el('button','fx-x','✕');
+      rm.title = 'Remove this card from the type';
+      rm.setAttribute('aria-label','Remove ' + (def ? def.name : fx.id));
+      rm.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        curEffects.splice(idx,1); dirty = true; syncCurType(); renderCards(); applyCurrent();
+      });
+      head.appendChild(rm);
+    }
+
+    const sw = el('button','fx-sw' + (fx.enabled && !grey ? ' on' : ''));
+    sw.setAttribute('aria-label', (def ? def.name : fx.id) + ' switch');
     if(grey) sw.disabled = true;
     sw.addEventListener('click', function(ev){
       ev.stopPropagation();
       if(grey) return;
-      toggleCard(card);
+      fx.enabled = !fx.enabled;
+      if(fx.enabled && def && def.kind === 'bands' && (!fx.bands || !fx.bands.length)){
+        fx.mode = fx.mode || 'mid';
+        fx.bands = bandsFromStrength(def, fx.mode);   // first time on: lay out sections at the default step
+      }
+      dirty = true; syncCurType(); renderCards(); applyCurrent();
     });
     head.appendChild(sw);
     div.appendChild(head);
 
-    if(div.classList.contains('open') && !grey){
-      const cfg = el('div','fx-cfg');
-      const st = el('div','strength');
-      st.appendChild(el('span','lb','Strength'));
-      ['light','mid','strong'].forEach(function(k){
-        const b = el('button','btn sm' + (cardStrengthNow(card) === k ? ' active' : ''),
-                     STRENGTH_LABEL[k]);
-        b.dataset.strength = k;
-        b.addEventListener('click', function(){ setCardStrength(card, k) });
-        st.appendChild(b);
-      });
-      cfg.appendChild(st);
-      if(on){
-        // While enabled these three bands ARE the three in the chain, so edit
-        // them directly (and push the change).
-        const hits = cardMatches(card);
-        card.bands.forEach(function(b, i){
-          if(!hits[i]) return;
-          const target = hits[i];
-          const row = paramRow(function(v){
-            if(isFinite(v.freq) && v.freq > 0) target.freq = v.freq;
-            if(isFinite(v.gain_db)) target.gain_db = v.gain_db;
-            if(isFinite(v.q) && v.q > 0) target.q = v.q;
-            renderChainMeta();
-            pushChain();
-          }, target, false);
-          cfg.appendChild(row);
-        });
-      } else {
-        cfg.appendChild(el('div','hint',
-          'Currently off. Turning it on adds these bands to the current chain, and then each band can be edited.'));
-      }
-      div.appendChild(cfg);
+    // The values only appear while the card is ON (when off they mean nothing)
+    if(fx.enabled && !grey){
+      const body = el('div','fx-body');
+      const kind = def ? def.kind : '';
+      if(kind === 'bands') renderBandControls(body, fx, def);
+      else if(kind === 'limiter') renderLimiterControls(body, fx);
+      else body.appendChild(el('div','hint','This effect has no adjustable values yet'));
+      div.appendChild(body);
     }
     box.appendChild(div);
   });
-  renderChainMeta();
+  if(!curEffects.length) box.appendChild(el('div','hint','This type has no effect cards yet'));
+  renderFxActions();
 }
 
-function toggleCard(card){
-  const hits = cardMatches(card);
-  const on = hits.length > 0 && hits.every(function(h){ return !!h });
-  if(on){
-    // Turning off removes the bands this card occupies (matched by frequency).
-    chain = chain.filter(function(it){
-      return !card.bands.some(function(b){
-        return Math.abs(it.freq - b.freq) <= Math.max(3, b.freq * 0.05);
-      });
-    });
-  } else {
-    const strength = cardCfg[card.id] || cardStrengthNow(card) || 'mid';
-    card.bands.forEach(function(b){
-      const exists = chain.some(function(it){
-        return Math.abs(it.freq - b.freq) <= Math.max(3, b.freq * 0.05);
-      });
-      if(!exists){
-        chain.push({ type:'peq', enabled:true, freq:b.freq,
-                     gain_db:+(STRENGTH_DB[strength] * b.g).toFixed(1), q:b.q });
-      }
-    });
-    chain.sort(function(a,b){ return a.freq - b.freq });
-  }
-  cardCfg[card.id] = cardCfg[card.id] || 'mid';
-  renderChain();
-  renderCards();
-  pushChain();
-}
-
-function setCardStrength(card, k){
-  cardCfg[card.id] = k;
-  // Changing the strength changes those bands' gains in the chain -- the card
-  // does not keep a separate copy of "its" parameters, which would drift.
-  card.bands.forEach(function(b){
-    const tol = Math.max(3, b.freq * 0.05);
-    chain.forEach(function(it){
-      if(Math.abs(it.freq - b.freq) <= tol){
-        it.gain_db = +(STRENGTH_DB[k] * b.g).toFixed(1);
-        it.q = b.q;
-      }
-    });
+// strength step x weight -> section gains
+function bandsFromStrength(def, mode){
+  const base = STRENGTH_DB[mode] || STRENGTH_DB.mid;
+  return def.bands.map(function(b){
+    return { type:'peq', enabled:true, freq:b.freq,
+             gain_db:+(base*b.g).toFixed(1), q:b.q };
   });
-  renderChain();
-  renderCards();
-  pushChain();
 }
 
-// ── Chain editor ──────────────────────────────────────────────────────
-// paramRow is the freq/gain/Q triple; the expanded card and the chain editor
-// share it. readOnly is for showing a template value that is not live yet.
-function paramRow(onChange, vals, readOnly){
-  const row = el('div','param-row');
-  function num(cls, value, step, min, max, label){
-    const i = document.createElement('input');
-    i.type = 'number';
-    i.className = cls;
-    i.value = value;
-    i.step = step; i.min = min; i.max = max;
-    i.setAttribute('aria-label', label);
-    if(readOnly) i.readOnly = true;
-    return i;
-  }
-  const f = num('pf', vals.freq, 1, FREQ_MIN, FREQ_MAX, 'Frequency');
-  const g = num('pg', vals.gain_db, 0.5, -GAIN_LIM, GAIN_LIM, 'Gain');
-  const q = num('pq', vals.q, 0.1, Q_MIN, Q_MAX, 'Q');
-  row.appendChild(f);
-  row.appendChild(el('span','unit','Hz'));
-  row.appendChild(g);
-  row.appendChild(el('span','unit','dB'));
-  row.appendChild(q);
-  row.appendChild(el('span','unit','Q'));
-  if(!readOnly && onChange){
-    [f,g,q].forEach(function(inp){
-      inp.addEventListener('input', function(){
-        // Read all three boxes together so a half-typed value never reaches
-        // the hardware.
-        onChange({
-          freq: parseFloat(f.value),
-          gain_db: parseFloat(g.value),
-          q: parseFloat(q.value),
-        });
-      });
+function renderBandControls(body, fx, def){
+  const st = el('div','strength');
+  st.appendChild(el('span','lb','Strength'));
+  ['light','mid','strong'].forEach(function(k){
+    const b = el('button','btn sm' + (fx.mode === k ? ' active' : ''), STRENGTH_LABEL[k]);
+    b.dataset.strength = k;
+    b.addEventListener('click', function(){
+      fx.mode = k;
+      fx.bands = bandsFromStrength(def, k);   // new step = lay the sections out again (then tweak each)
+      dirty = true; syncCurType(); renderCards(); applyCurrent();
     });
-  }
+    st.appendChild(b);
+  });
+  body.appendChild(st);
+
+  fx.bands.forEach(function(band, bi){
+    body.appendChild(sliderRow('Freq', sliderFromFreq(band.freq), function(v){
+      band.freq = +freqFromSlider(v).toFixed(0);
+      return band.freq + ' Hz';
+    }, bi, 'freq'));
+    body.appendChild(sliderRow('Gain', (band.gain_db + GAIN_LIM) / (2*GAIN_LIM) * SLIDER_STEPS,
+    function(v){
+      band.gain_db = +(v / SLIDER_STEPS * 2*GAIN_LIM - GAIN_LIM).toFixed(1);
+      return (band.gain_db >= 0 ? '+' : '') + band.gain_db.toFixed(1) + ' dB';
+    }, bi, 'gain'));
+    body.appendChild(sliderRow('Q', sliderFromQ(band.q), function(v){
+      band.q = +qFromSlider(v).toFixed(2);
+      return band.q.toFixed(2);
+    }, bi, 'q'));
+  });
+}
+
+// One row = label + slider + value. Dragging only updates the value cell
+// (never re-lays-out the DOM under a finger); pushing is debounced.
+function sliderRow(label, initVal, write, bandIndex, which){
+  const row = el('div','ctl');
+  row.appendChild(el('span','lb', label));
+  const inp = document.createElement('input');
+  inp.type = 'range';
+  inp.min = 0; inp.max = SLIDER_STEPS; inp.step = 1;
+  inp.value = Math.max(0, Math.min(SLIDER_STEPS, Math.round(initVal)));
+  inp.dataset.band = bandIndex; inp.dataset.param = which;
+  const val = el('span','val','');
+  inp.addEventListener('input', function(){
+    val.textContent = write(parseFloat(inp.value));
+    dirty = true; syncCurType();
+    applyCurrent();
+  });
+  val.textContent = write(parseFloat(inp.value));
+  row.appendChild(inp);
+  row.appendChild(val);
   return row;
 }
 
-function renderChainMeta(){
-  const m = $('chain-meta');
-  if(!m) return;
-  const n = chain.filter(function(it){ return it.enabled !== false }).length;
-  const lim = maxBands();
-  m.textContent = 'Using ' + n + ' / ' + lim + ' bands';
-  m.className = 'chain-meta' + (n > lim ? ' over' : '');
-  if(n > lim) m.textContent += ' (over the limit, applying will be rejected)';
-}
-
-function renderChain(){
-  const box = $('chain-list');
-  if(!box) return;
-  box.innerHTML = '';
-  if(!chain.length){
-    box.appendChild(el('div','hint','Flat (no effect bands)'));
-    renderChainMeta();
-    return;
-  }
-  chain.forEach(function(it, idx){
-    const row = el('div','chain-row');
-    const pr = paramRow(function(v){
-      if(isFinite(v.freq) && v.freq > 0) it.freq = v.freq;
-      if(isFinite(v.gain_db)) it.gain_db = v.gain_db;
-      if(isFinite(v.q) && v.q > 0) it.q = v.q;
-      renderChainMeta();
-      renderCards();
-      pushChain();
-    }, it, false);
-    row.appendChild(pr);
-    const rm = el('button','btn sm danger rm','✕');
-    rm.setAttribute('aria-label','Remove this band');
-    rm.addEventListener('click', function(){
-      chain.splice(idx, 1);
-      renderChain(); renderCards(); pushChain();
+function renderLimiterControls(body, fx){
+  const st = el('div','strength');
+  st.appendChild(el('span','lb','Mode'));
+  [['feedback','Legacy (no lookahead)'],['truepeak','True-peak (lookahead)']].forEach(function(pair){
+    const b = el('button','btn sm' + ((fx.mode || 'feedback') === pair[0] ? ' active' : ''), pair[1]);
+    b.dataset.mode = pair[0];
+    if(pair[0] === 'truepeak' && !truepeakAvailable()){
+      b.disabled = true;
+      b.title = 'This bitstream has no true-peak limiter';
+    }
+    b.addEventListener('click', function(){
+      if(pair[0] === 'truepeak' && !truepeakAvailable()){
+        showNotice('This bitstream has no true-peak limiter', 'warn',
+          ['Older bitstreams only carry the feedback limiter; this becomes clickable with a newer one']);
+        return;
+      }
+      fx.mode = pair[0]; dirty = true; syncCurType(); renderCards(); applyCurrent();
     });
-    row.appendChild(rm);
-    box.appendChild(row);
+    st.appendChild(b);
   });
-  renderChainMeta();
+  body.appendChild(st);
+
+  const p = fx.params || {};
+  const thr = (typeof p.thr_db === 'number') ? p.thr_db : -1;
+  body.appendChild(sliderRow('Threshold', (thr + 24) / 24 * SLIDER_STEPS, function(v){
+    const db = +(v / SLIDER_STEPS * 24 - 24).toFixed(1);
+    fx.params = fx.params || {};
+    fx.params.thr_db = db;
+    return db.toFixed(1) + ' dBFS';
+  }, 0, 'thr'));
+
+  const hint = el('div','hint','');
+  const L = (caps && caps.limiter) || {};
+  if((fx.mode || 'feedback') === 'truepeak' && typeof L.att_ms === 'number'){
+    hint.textContent = 'True-peak: 2 ms lookahead, bit-transparent below threshold; actual time constants ' +
+      L.att_ms.toFixed(2) + ' ms / ' + L.rel_ms.toFixed(0) + ' ms (max ' + L.rel_ms_max + ' ms)';
+  } else {
+    hint.textContent = 'Legacy: no lookahead, so 0 dBFS material shows waveform discontinuities (thousands per second).';
+  }
+  body.appendChild(hint);
 }
 
-// ── Presets ───────────────────────────────────────────────────────────
+function renderFxActions(){
+  const acts = $('fx-actions');
+  if(!acts) return;
+  acts.innerHTML = '';
+  // Any effect this type does not have yet can be added (each type has its own cards)
+  const available = EFFECTS.filter(function(def){
+    return !curEffects.some(function(fx){ return fx.id === def.id });
+  });
+  if(available.length){
+    const pick = document.createElement('select');
+    pick.id = 'fx-pick';
+    pick.style.cssText = 'background:#25253e;border:1px solid #2f2f48;border-radius:8px;'+
+                         'color:#dcdcf0;font-size:11px;padding:6px 8px';
+    available.forEach(function(def){
+      const o = document.createElement('option');
+      o.value = def.id;
+      o.textContent = def.requires ? (def.name + ' (needs a newer engine)') : def.name;
+      pick.appendChild(o);
+    });
+    acts.appendChild(pick);
+    const add = el('button','btn sm primary','+ Add this card');
+    add.id = 'fx-add';
+    add.addEventListener('click', function(){
+      const def = effectDef(pick.value);
+      if(!def) return;
+      const fx = { id:def.id, enabled:!def.requires, mode:'mid', params:{}, bands:[] };
+      if(def.kind === 'bands') fx.bands = bandsFromStrength(def, 'mid');
+      if(def.kind === 'limiter'){
+        fx.enabled = true; fx.mode = truepeakAvailable() ? 'truepeak' : 'feedback';
+        fx.params = { thr_db:-1, att_ms:0.09, rel_ms:43 };
+      }
+      curEffects.push(fx);
+      dirty = true; syncCurType(); renderCards(); applyCurrent();
+    });
+    acts.appendChild(add);
+  }
+  const hint = $('fx-hint');
+  if(hint){
+    const used = enabledBands();
+    hint.textContent = 'Using ' + used + ' / ' + maxBands() + ' bands' +
+      (used > maxBands() ? ' (over the limit, applying will be rejected)' : '') +
+      '; these cards belong to the type "' + curName + '"';
+    hint.style.color = used > maxBands() ? '#f0a8b4' : '';
+  }
+}
+
+function enabledBands(){
+  let n = 0;
+  curEffects.forEach(function(fx){
+    if(!fx.enabled) return;
+    const def = effectDef(fx.id);
+    if(def && def.kind === 'bands') n += (fx.bands || []).length;
+  });
+  return n;
+}
+
+// -- Pushing to the hardware (debounced) --
+let applyTimer = null;
+function applyCurrent(){           // collapse a drag into one push
+  if(applyTimer) clearTimeout(applyTimer);
+  applyTimer = setTimeout(applyNow, 250);
+}
+
+async function applyNow(){
+  if(applyTimer){ clearTimeout(applyTimer); applyTimer = null }
+
+  // (1) chain: collect the sections of every enabled bands effect, sorted by frequency
+  const items = [];
+  curEffects.forEach(function(fx){
+    if(!fx.enabled) return;
+    const def = effectDef(fx.id);
+    if(!def || def.kind !== 'bands') return;
+    (fx.bands || []).forEach(function(b){
+      items.push({ type:b.type || 'peq', enabled:true,
+                   freq:+b.freq, gain_db:+b.gain_db, q:+b.q });
+    });
+  });
+  items.sort(function(a,b){ return a.freq - b.freq });
+
+  if(items.length > maxBands()){
+    // No truncation: say what the backend would say (it will refuse as well)
+    showNotice('This type needs ' + items.length + ' bands, this device has ' + maxBands() + ' bands',
+      'err', ['Turn a card off or enable fewer sections; nothing is dropped for you silently.']);
+  } else {
+    try {
+      const d = await postJSON('/api/dsp/chain', { chain: items }, 'PUT');
+      if(d && typeof d.preamp_db === 'number' && d.preamp_db < -0.05){
+        showNotice('Applied (' + d.applied + ' bands). Overall level reduced by ' +
+          Math.abs(d.preamp_db).toFixed(1) + ' dB', 'ok');
+      }
+    } catch(e){
+      showNotice('This chain was not applied', 'err', [e.message]);
+    }
+  }
+
+  // (2) limiter: an optional stage at the end of the chain, not a chain section
+  const lim = fxState('limiter');
+  if(lim){
+    try {
+      const p = lim.params || {};
+      await postJSON('/api/dsp/limiter', {
+        enabled: !!lim.enabled,
+        mode: lim.mode || 'feedback',
+        thr_db: (typeof p.thr_db === 'number') ? p.thr_db : -1,
+      });
+    } catch(e){ showNotice('Limiter setting failed', 'err', [e.message]) }
+  }
+
+  // (3) remember this type -- only written to disk when the user really changed it
+  if(!dirty) return;
+  try {
+    syncCurType();
+    const t = curType();
+    if(t){
+      await postJSON('/api/dsp/types', { name:t.name, note:t.note || '', effects:curEffects });
+      if(t.builtin){ t.builtin = false; renderTypes() }
+      dirty = false;
+    }
+  } catch(e){ showNotice('This type could not be saved', 'err', [e.message]) }
+}
+
+// -- Genre presets (secondary) --
 async function loadPresets(){
   try {
     const d = await api('/api/dsp/presets');
@@ -804,460 +869,90 @@ async function loadPresets(){
   if(hint){
     const nb = caps && caps.presets ? caps.presets.builtin : null;
     hint.textContent = (nb === 0 || nb === null)
-      ? 'No built-in library installed (/usr/share/zybo-audio/presets/library.json missing) -- a packaging matter, not a broken UI'
-      : 'Built-in ' + caps.presets.builtin + ' + mine ' + (caps.presets.user || 0) + '; greyed ones need a newer engine';
+      ? 'No built-in library installed -- a packaging matter, not a broken UI'
+      : 'Built-in ' + caps.presets.builtin + ' + mine ' + (caps.presets.user || 0) +
+        '. Applying a genre preset replaces the current chain (your types are untouched).';
   }
 }
-
 function renderPresets(){
   const box = $('preset-list');
   if(!box) return;
   box.innerHTML = '';
-  const builtin = presets.filter(function(p){ return p.builtin });
-  const user = presets.filter(function(p){ return !p.builtin });
-  function group(title, list){
-    if(!list.length) return;
-    box.appendChild(el('div','pst-sec', title));
-    list.forEach(function(p){ box.appendChild(presetItem(p)) });
-  }
-  group('Built-in', builtin);
-  group('Mine', user);
-  if(!presets.length){
-    box.appendChild(el('div','hint','No presets available yet'));
-  }
+  presets.forEach(function(p){ box.appendChild(presetItem(p)) });
+  if(!presets.length) box.appendChild(el('div','hint','No presets available yet'));
 }
-
-// Which preset is in use is DERIVED by comparing the current chain, not
-// remembered from "which button was clicked": after applying a preset,
-// importing, editing one band or A/B switching, the chain can differ from the
-// button that was pressed. If nothing matches, the chain is simply custom.
-function sameChain(a, b){
-  const norm = function(list){
-    return (list || []).filter(function(it){ return it.enabled !== false })
-      .map(function(it){
-        return { freq:+it.freq, gain_db:+it.gain_db, q:+it.q };
-      })
-      .sort(function(x,y){ return x.freq - y.freq });
-  };
-  const x = norm(a), y = norm(b);
-  if(x.length !== y.length) return false;
-  for(let i=0;i<x.length;i++){
-    if(Math.abs(x[i].freq - y[i].freq) > 0.5) return false;
-    if(Math.abs(x[i].gain_db - y[i].gain_db) > 0.15) return false;
-    if(Math.abs(x[i].q - y[i].q) > 0.05) return false;
-  }
-  return true;
-}
-function currentPresetName(){
-  for(let i=0;i<presets.length;i++){
-    const p = presets[i];
-    if(p.usable && p.chain && sameChain(p.chain, chain)) return p.name;
-  }
-  return '';
-}
-
 function presetItem(p){
-  const item = el('div','pst-item' + (!p.usable ? ' grey' : '') +
-                        (p.name === currentPresetName() ? ' active' : ''));
-  item.dataset.preset = p.name;
-  item.dataset.usable = p.usable ? '1' : '0';
+  const item = el('div','pst-item' + (!p.usable ? ' grey' : ''));
+  item.dataset.preset = p.name; item.dataset.usable = p.usable ? '1' : '0';
   const nm = el('div','nm', p.name);
-  nm.title = (p.why && p.why.length) ? p.why.join('; ')
-           : (p.note || (p.bands + ' bands'));
-  // A greyed preset is not clickable: the backend would answer 409 anyway, and
-  // the UI should not offer an action that is bound to fail.
-  if(p.usable){
-    nm.addEventListener('click', function(){ applyPreset(p.name) });
-  } else {
-    nm.addEventListener('click', function(){
-      showNotice('"' + p.name + '" is not usable yet', 'warn', p.why || ['needs a newer engine']);
-    });
-  }
+  nm.title = (p.why && p.why.length) ? p.why.join('; ') : (p.note || (p.bands + ' bands'));
+  if(p.usable) nm.addEventListener('click', function(){ applyPreset(p.name) });
+  else nm.addEventListener('click', function(){
+    showNotice('"' + p.name + '" is not usable yet', 'warn', p.why || ['needs a newer engine']);
+  });
   item.appendChild(nm);
   item.appendChild(el('div','mini', p.usable ? (p.bands + 'bd') : (p.stage || 'planned')));
-  const acts = el('div','acts');
-  const exp = el('button', null, '⤓');
-  exp.title = 'Export this preset';
-  exp.addEventListener('click', function(ev){
-    ev.stopPropagation();
-    exportPreset(p.name);
-  });
-  acts.appendChild(exp);
-  if(!p.builtin){
-    const ren = el('button', null, '✎');
-    ren.title = 'Rename';
-    ren.addEventListener('click', function(ev){
-      ev.stopPropagation();
-      renamePreset(p.name);
-    });
-    acts.appendChild(ren);
-    const del = el('button', null, '✕');
-    del.title = 'Delete';
-    del.addEventListener('click', function(ev){
-      ev.stopPropagation();
-      deletePreset(p.name);
-    });
-    acts.appendChild(del);
-  }
-  item.appendChild(acts);
   return item;
 }
-
 async function applyPreset(name){
   try {
-    const d = await postJSON('/api/dsp/presets/apply', { name: name });
-    const applied = d.name || name;
-    clearNotice();
+    const d = await postJSON('/api/dsp/presets/apply', { name:name });
     if(typeof d.preamp_db === 'number' && d.preamp_db < -0.05){
-      showNotice('Applied "' + applied + '". Overall level reduced by ' +
-                 Math.abs(d.preamp_db).toFixed(1) + ' dB to avoid clipping', 'ok');
-    }
-    await loadChain(true);
-    renderPresets();
+      showNotice('Applied "' + name + '". Level reduced by ' + Math.abs(d.preamp_db).toFixed(1) + ' dB to avoid clipping', 'ok');
+    } else showNotice('Applied "' + name + '"', 'ok');
   } catch(e){
-    // 409 = needs a newer engine (the backend explains why); 400 = does not fit
-    if(e.status === 409){
-      showNotice('This preset is not usable yet (engine too small)', 'warn', [e.message]);
-    } else {
-      showNotice('Could not apply the preset', 'err', [e.message]);
-    }
+    if(e.status === 409) showNotice('This preset is not usable yet (engine too small)', 'warn', [e.message]);
+    else showNotice('Could not apply the preset', 'err', [e.message]);
   }
 }
-
 async function savePreset(){
   const name = (window.prompt && window.prompt('Preset name?', 'My sound')) || '';
   if(!name.trim()) return;
   try {
-    await postJSON('/api/dsp/presets', { name: name.trim() });
+    await postJSON('/api/dsp/presets', { name:name.trim() });
     showNotice('Saved as "' + name.trim() + '"', 'ok');
     await loadPresets();
-  } catch(e){
-    showNotice('Save failed', 'err', [e.message]);
-  }
+  } catch(e){ showNotice('Save failed', 'err', [e.message]) }
 }
-async function renamePreset(from){
-  const to = (window.prompt && window.prompt('New name?', from)) || '';
-  if(!to.trim() || to.trim() === from) return;
-  try {
-    await postJSON('/api/dsp/presets/rename', { from: from, to: to.trim() });
-    showNotice('Renamed to "' + to.trim() + '"', 'ok');
-    await loadPresets();
-  } catch(e){
-    showNotice('Rename failed', 'err', [e.message]);
-  }
-}
-async function deletePreset(name){
-  if(!(window.confirm && window.confirm('Delete preset "' + name + '"?'))) return;
-  try {
-    await postJSON('/api/dsp/presets/delete', { name: name });
-    showNotice('Deleted "' + name + '"', 'ok');
-    await loadPresets();
-  } catch(e){
-    showNotice('Delete failed', 'err', [e.message]);
-  }
-}
-function exportPreset(name){
-  const a = document.createElement('a');
-  a.href = API + '/api/dsp/presets/export?name=' + encodeURIComponent(name);
-  a.download = name + '.json';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-}
-
-// ── Import ────────────────────────────────────────────────────────────
-// The file content is sent as the request body to /api/dsp/presets/import
-// (the backend detects the format: custom JSON, REW text or EqualizerAPO).
-// The returned warnings must be shown -- "which lines were not applied" is the
-// single most important sentence in an import.
 async function importFile(file){
   const text = await file.text();
   const base = file.name.replace(/\.[^.]+$/, '');
   try {
     const d = await api('/api/dsp/presets/import?name=' + encodeURIComponent(base), {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: text,
-    });
+      method:'POST', headers:{'Content-Type':'application/json'}, body:text });
     const warns = (d.warnings || []).slice();
     if(d.apply_error) warns.push('Saved as a preset, but not applied to the hardware: ' + d.apply_error);
-    if(warns.length){
-      showNotice('Import finished with ' + warns.length + ' thing(s) to report', 'warn', warns);
-    } else {
-      showNotice('Import finished' + (d.preset ? ': ' + d.preset.name : ''), 'ok');
-    }
+    if(warns.length) showNotice('Import finished with ' + warns.length + ' thing(s) to report', 'warn', warns);
+    else showNotice('Import finished' + (d.preset ? ': ' + d.preset.name : ''), 'ok');
     await loadPresets();
-    if(d.applied) await loadChain(true);
-  } catch(e){
-    // The backend's message already carries its own context; do not wrap it again.
-    showNotice(e.message, 'err', []);
-  }
+  } catch(e){ showNotice(e.message, 'err', []) }
 }
 
-// ── Limiter ───────────────────────────────────────────────────────────
-function renderLimiter(){
-  const d = state.dsp || {};
-  const on = !!d.limiter;
-  const btn = $('lim-toggle');
-  if(btn){
-    btn.textContent = on ? 'Limiter on' : 'Limiter off';
-    btn.classList.toggle('active', on);
-  }
-  const tp = truepeakAvailable();
-  const fbBtn = $('lim-mode-feedback'), tpBtn = $('lim-mode-truepeak');
-  const mode = d.limiter_mode || (caps && caps.limiter && caps.limiter.mode) || 'feedback';
-  if(fbBtn){
-    fbBtn.classList.toggle('active', mode !== 'truepeak');
-    fbBtn.disabled = false;
-  }
-  if(tpBtn){
-    tpBtn.classList.toggle('active', mode === 'truepeak');
-    // If the hardware has no true-peak mode, do not let it be clicked: on a
-    // bitstream without it, clicking would do nothing at all.
-    tpBtn.disabled = !tp;
-    tpBtn.title = tp ? '' : 'This bitstream has no true-peak limiter';
-  }
-  const thr = $('lim-thr');
-  if(thr && document.activeElement !== thr && typeof d.lim_thr_db === 'number'){
-    thr.value = d.lim_thr_db;
-    setText('lim-thr-val', (+d.lim_thr_db).toFixed(1) + ' dBFS');
-  }
-  const hint = $('lim-hint');
-  if(hint){
-    const L = (caps && caps.limiter) || {};
-    if(!on){
-      hint.textContent = 'Limiter is off: nothing prevents clipping, so 0 dBFS material can clip.';
-    } else if(mode === 'truepeak'){
-      hint.textContent = 'True-peak: 2 ms lookahead plus log-domain smoothing, bit-transparent below threshold.' +
-        (typeof L.att_ms === 'number'
-          ? ' Actual time constants ' + L.att_ms.toFixed(2) + ' ms / ' + L.rel_ms.toFixed(0) +
-            ' ms (max ' + L.rel_ms_max + ' ms)'
-          : '');
-    } else {
-      hint.textContent = 'Legacy: no lookahead, so 0 dBFS material shows waveform discontinuities (thousands per second).';
-    }
-  }
-}
-function pushLimiter(body){
-  return postJSON('/api/dsp/limiter', body).catch(function(e){
-    showNotice('Limiter setting failed', 'err', [e.message]);
-  });
-}
-
-// ── Wizard ────────────────────────────────────────────────────────────
-function renderWizard(){
-  const dots = $('wiz-dots'), q = $('wiz-q'), opts = $('wiz-opts'), acts = $('wiz-actions');
-  if(!dots) return;
-  dots.innerHTML = ''; opts.innerHTML = ''; acts.innerHTML = '';
-  [1,2,3,4].forEach(function(i){
-    const d = el('div','wiz-dot' + (wizard.step === i ? ' active' : '') +
-                          (wizard.step > i ? ' done' : ''), String(i));
-    d.dataset.step = String(i);
-    d.addEventListener('click', function(){ wizard.step = i; renderWizard() });
-    dots.appendChild(d);
-  });
-
-  function optBtn(label, active, fn, hint){
-    const b = el('button','btn' + (active ? ' active' : ''), label);
-    if(hint) b.title = hint;
-    b.dataset.opt = label;
-    b.addEventListener('click', fn);
-    opts.appendChild(b);
-    return b;
-  }
-
-  if(wizard.step === 1){
-    q.textContent = '1. What do you listen on?';
-    DEVICES.forEach(function(dv){
-      optBtn(dv.label, wizard.device === dv.id, function(){
-        wizard.device = dv.id; renderWizard();
-      }, dv.hint);
-    });
-  } else if(wizard.step === 2){
-    q.textContent = '2. What would you like to improve? (up to 3, ' + wizard.goals.length + ' selected)';
-    GOALS.forEach(function(g){
-      optBtn(g.label, wizard.goals.indexOf(g.id) >= 0, function(){
-        const i = wizard.goals.indexOf(g.id);
-        if(i >= 0) wizard.goals.splice(i, 1);
-        else if(wizard.goals.length < 3) wizard.goals.push(g.id);
-        else showNotice('At most 3 items', 'warn', ['Picking too many produces an "I want everything" curve, which usually sounds worse']);
-        renderWizard();
-      });
-    });
-  } else if(wizard.step === 3){
-    q.textContent = '3. How strong?';
-    ['light','mid','strong'].forEach(function(k){
-      optBtn(STRENGTH_LABEL[k], wizard.strength === k, function(){
-        wizard.strength = k; renderWizard();
-      }, STRENGTH_DB[k] + ' dB');
-    });
-  } else {
-    q.textContent = '4. Generate';
-    const b = el('button','btn primary','Generate and apply');
-    b.id = 'wiz-generate';
-    b.addEventListener('click', generateFromWizard);
-    acts.appendChild(b);
-  }
-
-  // Back / next
-  if(wizard.step < 4){
-    const next = el('button','btn primary','Next');
-    next.id = 'wiz-next';
-    next.addEventListener('click', function(){
-      if(wizard.step === 2 && !wizard.goals.length){
-        showNotice('Pick at least one thing to improve', 'warn', ['If you are not sure, use the effect cards or a preset below instead']);
-        return;
-      }
-      wizard.step = Math.min(4, wizard.step + 1);
-      renderWizard();
-    });
-    acts.appendChild(next);
-  }
-  const prev = el('button','btn','Back');
-  prev.id = 'wiz-prev';
-  prev.disabled = wizard.step === 1;
-  prev.addEventListener('click', function(){ wizard.step = Math.max(1, wizard.step-1); renderWizard() });
-  acts.insertBefore(prev, acts.firstChild);
-
-  renderWizardOut();
-}
-
-function wizBands(){
-  const dev = DEVICES.find(function(d){ return d.id === wizard.device }) || DEVICES[1];
-  const base = STRENGTH_DB[wizard.strength];
-  const out = [];
-  wizard.goals.forEach(function(id){
-    const g = GOALS.find(function(x){ return x.id === id });
-    if(!g) return;
-    g.bands.forEach(function(b){
-      out.push({ freq:b.freq, q:b.q, gain_db: b.g * base * dev.scale });
-    });
-  });
-  // Merge bands at the same frequency (within 20%): keep the larger magnitude,
-  // and the Q of the first one seen.
-  const merged = [];
-  out.forEach(function(b){
-    const hit = merged.find(function(m){ return Math.abs(m.freq - b.freq) <= m.freq * 0.2 });
-    if(hit){
-      if(Math.abs(b.gain_db) > Math.abs(hit.gain_db)) hit.gain_db = b.gain_db;
-    } else {
-      merged.push({ freq:b.freq, q:b.q, gain_db:b.gain_db });
-    }
-  });
-  merged.sort(function(a,b){ return a.freq - b.freq });
-  return merged.map(function(b){
-    return { type:'peq', enabled:true, freq:b.freq, q:b.q,
-             gain_db:+Math.max(-24, Math.min(24, b.gain_db)).toFixed(1) };
-  });
-}
-
-async function generateFromWizard(){
-  const items = wizBands();
-  const lim = maxBands();
-  if(items.length > lim){
-    // No truncation: say how many bands were produced and which ones, so the
-    // user can drop an item.
-    showNotice('The generated curve needs ' + items.length + ' bands, but this device has ' + lim + ' bands',
-      'err', ['Drop one item, or remove one of two similar choices: ' +
-              items.map(function(i){ return Math.round(i.freq) + 'Hz' }).join(', ')]);
-    return;
-  }
-  abChain = chain.map(function(it){ return Object.assign({}, it) });
-  try {
-    const d = await postJSON('/api/dsp/chain', { chain: items }, 'PUT');
-    abSide = 'B';
-    wizard.generated = items;
-    await loadChain(true);
-    clearNotice();
-    let msg = 'Generated ' + items.length + ' bands';
-    if(typeof d.preamp_db === 'number' && d.preamp_db < -0.05){
-      msg += '; reduced by ' + Math.abs(d.preamp_db).toFixed(1) + ' dB to avoid clipping';
-    }
-    showNotice(msg, 'ok');
-    renderWizardOut();
-  } catch(e){
-    showNotice('Generate failed', 'err', [e.message]);
-  }
-}
-
-function renderWizardOut(){
-  const out = $('wiz-out');
-  if(!out) return;
-  out.innerHTML = '';
-  if(wizard.step < 4 || !wizard.generated){
-    out.appendChild(el('div', null, 'The wizard only touches the bands related to your goal. After generating you can A/B it and save it as a preset.'));
-    return;
-  }
-  const items = wizard.generated;
-  out.appendChild(el('div', null, 'Result: ' +
-    items.map(function(i){ return Math.round(i.freq) + 'Hz ' +
-      (i.gain_db >= 0 ? '+' : '') + i.gain_db.toFixed(1) + 'dB' }).join(', ')));
-  const ab = el('div','ab');
-  const a = el('button','btn' + (abSide === 'A' ? ' active' : ''), 'Hear A (before)');
-  a.id = 'wiz-ab-a';
-  a.disabled = !abChain;
-  a.addEventListener('click', function(){ switchAB('A') });
-  const b = el('button','btn' + (abSide === 'B' ? ' active' : ''), 'Hear B (result)');
-  b.id = 'wiz-ab-b';
-  b.addEventListener('click', function(){ switchAB('B') });
-  const save = el('button','btn', 'Save as my preset');
-  save.id = 'wiz-save';
-  save.addEventListener('click', savePreset);
-  ab.appendChild(a); ab.appendChild(b); ab.appendChild(save);
-  out.appendChild(ab);
-}
-
-async function switchAB(side){
-  const target = side === 'A' ? abChain : wizard.generated;
-  if(!target) return;
-  try {
-    await postJSON('/api/dsp/chain', { chain: target }, 'PUT');
-    abSide = side;
-    await loadChain(true);
-    renderWizardOut();
-    showNotice('Listening to ' + side + (side === 'A' ? ' (before)' : ' (result)'), 'ok');
-  } catch(e){
-    showNotice('A/B switch failed', 'err', [e.message]);
-  }
-}
-
-// ── Status (WebSocket / polling) ──────────────────────────────────────
+// -- Status (WebSocket / polling) --
 async function fetchStatus(){
-  try {
-    const r = await fetch(API + '/api/status');
-    if(!r.ok) return;
-    state = await r.json();
-    renderStatus();
-  } catch(e){}
+  try { const r = await fetch(API + '/api/status'); if(!r.ok) return;
+        state = await r.json(); renderStatus() } catch(e){}
 }
 function connectWS(){
   const proto = location.protocol==='https:'?'wss':'ws';
   let ws;
   try { ws = new WebSocket(proto+'://'+location.host+'/ws') } catch(e){ return }
-  ws.onmessage = function(ev){
-    try { state = JSON.parse(ev.data); renderStatus() } catch(e){}
-  };
-  ws.onclose = function(){ setTimeout(connectWS,2000) };
+  ws.onmessage = function(ev){ try { state = JSON.parse(ev.data); renderStatus() } catch(e){} };
+  ws.onclose = function(){ setTimeout(connectWS, 2000) };
 }
 function renderStatus(){
-  // now-playing: the title says whether audio is flowing, the subtitle says
-  // what is playing / how to start it, and the badge says which source is
-  // selected -- three separate facts that no longer contradict each other.
-  setText('np-title', state.playing ? (state.title || 'Playing…') : 'Not playing');
+  setText('np-title', state.playing ? (state.title || 'Playing...') : 'Not playing');
   setText('np-artist', state.artist ? state.artist+(state.album?' — '+state.album:'') :
     state.source==='idle' ? 'No source selected' :
     state.playing ? ((SRC_LABEL[state.source]||state.source)+' playing') :
     (SRC_HINT[state.source]||'Waiting for playback'));
-  $('source-badge').textContent = state.source==='idle' ? 'Idle' :
-    (SRC_LABEL[state.source]||state.source);
+  $('source-badge').textContent = state.source==='idle' ? 'Idle' : (SRC_LABEL[state.source]||state.source);
   $('source-badge').style.background = state.source==='idle'?'#25253e':'#2a2a4e';
 
   ['idle','airplay','dlna','bluetooth'].forEach(function(s){
     const e = $('src-'+s);
     if(!e) return;
     e.classList.toggle('active', state.source===s);
-    // Hide sources this image does not ship (a greyed button plus a tooltip
-    // still implies "clickable, just disabled").
     const avail = (s==='idle') || !state.sources || state.sources[s] !== false;
     e.disabled = !avail;
     e.style.display = avail ? '' : 'none';
@@ -1268,22 +963,22 @@ function renderStatus(){
   if(vs && document.activeElement !== vs) vs.value = Math.round(-60 + state.volume*0.6);
   setText('vol-pct', state.volume+'%');
   setText('vol-db', fmtDB(state.volume_db, state.volume));
-
   setText('app-ver', state.version ? 'v'+state.version : '');
   setText('sys-cpu', state.system.cpu_percent);
   setText('sys-ram', state.system.mem_used_mb);
   setText('sys-uptime', fmtUptime(state.system.uptime_sec));
-  renderLimiter();
+}
+function fmtDB(db, pct){
+  if(pct <= 0) return 'Muted';
+  return (db > 0 ? '+' : '') + db.toFixed(0) + ' dB';
 }
 function fmtUptime(sec){
   if(!sec || sec<0) return '--';
-  const h = Math.floor(sec/3600);
-  const m = Math.floor((sec%3600)/60);
-  if(h>0) return h+'h'+m+'m';
-  return m+'m';
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60);
+  return h>0 ? h+'h'+m+'m' : m+'m';
 }
 
-// ── Event wiring ──────────────────────────────────────────────────────
+// -- Event wiring --
 document.querySelectorAll('.src-btn').forEach(function(btn){
   btn.addEventListener('click', function(){
     const src = this.dataset.src;
@@ -1294,55 +989,16 @@ document.querySelectorAll('.src-btn').forEach(function(btn){
   });
 });
 
-// The slider is calibrated in dB, not percent: the codec only has a 1 dB grid,
-// and squeezing 60 dB into 100 steps is 1.667% per step, which makes a
-// percentage slider disagree with the hardware ("set 62, reads 63"). The
-// backend's percentage scale is fixed at -60 dB..0 dB <-> 0%..100%, so this
-// conversion shares the backend's definition.
+// The volume slider is the codec's real 1 dB grid (-60..0); the percentage and dB
 $('vol-slider').addEventListener('input', function(){
-  const db = +this.value;                        // -60 = muted
-  const vol = Math.round((db+60)/0.6);           // percentage the backend expects
+  const db = +this.value;
+  const vol = Math.round((db+60)/0.6);
   setText('vol-pct', vol+'%');
-  setText('vol-db', fmtDB(db, vol));             // dB is the hardware truth
+  setText('vol-db', fmtDB(db, vol));
   clearTimeout(this._timer);
   this._timer = setTimeout(function(){
     postJSON('/api/volume', {volume:vol}).catch(function(){});
   }, 150);
-});
-
-$('lim-toggle').addEventListener('click', function(){
-  pushLimiter({ enabled: !(state.dsp && state.dsp.limiter) });
-});
-$('lim-mode-feedback').addEventListener('click', function(){
-  pushLimiter({ mode: 'feedback' });
-});
-$('lim-mode-truepeak').addEventListener('click', function(){
-  if(!truepeakAvailable()){
-    showNotice('This bitstream has no true-peak limiter', 'warn',
-      ['Legacy bitstreams only carry the feedback limiter; this becomes clickable with a newer bitstream']);
-    return;
-  }
-  pushLimiter({ mode: 'truepeak' });
-});
-$('lim-thr').addEventListener('input', function(){
-  const v = parseFloat(this.value);
-  setText('lim-thr-val', v.toFixed(1)+' dBFS');
-  clearTimeout(this._timer);
-  this._timer = setTimeout(function(){ pushLimiter({ thr_db: v }) }, 150);
-});
-
-$('btn-add-band').addEventListener('click', function(){
-  const used = chain.length;
-  const freq = DEFAULT_FREQS[Math.min(used, DEFAULT_FREQS.length-1)];
-  chain.push({ type:'peq', enabled:true, freq:freq, gain_db:0, q:1.0 });
-  chain.sort(function(a,b){ return a.freq - b.freq });
-  renderChain(); renderCards(); pushChain();
-});
-$('btn-chain-clear').addEventListener('click', function(){
-  if(!chain.length) return;
-  if(!(window.confirm && window.confirm('Clear the current chain (back to flat)?'))) return;
-  chain = [];
-  renderChain(); renderCards(); pushChain();
 });
 
 $('btn-save-preset').addEventListener('click', savePreset);
@@ -1350,51 +1006,39 @@ $('btn-import').addEventListener('click', function(){ $('file-import').click() }
 $('file-import').addEventListener('change', function(){
   const f = this.files && this.files[0];
   if(!f) return;
-  importFile(f);
-  this.value = '';   // allow importing the same file twice in a row
+  importFile(f); this.value = '';
 });
 
-// ── Reboot ────────────────────────────────────────────────────────────
-// POST /api/reboot just runs `reboot` and reports no progress, so probe for
-// liveness here: reload the page automatically once the backend is back
-// (about 20-30 s), instead of asking the user to refresh.
 $('btn-reboot').addEventListener('click', function(){
-  if(!(window.confirm && window.confirm('Reboot ZYBO Audio?\n\nPlayback stops immediately and this page returns automatically in about 30 seconds.'))) return;
+  if(!(window.confirm && window.confirm('Reboot ZYBO Audio?\n\nPlayback stops immediately and this page returns automatically.'))) return;
   const btn = this;
-  btn.disabled = true;
-  btn.textContent = 'Rebooting…';
-  setText('sys-note', 'The device is rebooting; this page will refresh itself…');
-  fetch(API+'/api/reboot', { method:'POST' }).catch(function(){});
+  btn.disabled = true; btn.textContent = 'Rebooting...';
+  setText('sys-note', 'The device is rebooting; this page will refresh itself...');
+  fetch(API+'/api/reboot', {method:'POST'}).catch(function(){});
   let tries = 0;
   const timer = setInterval(function(){
     tries++;
     fetch(API+'/api/status').then(function(r){
-      if(r.ok){                       // the backend answered: it is back
-        clearInterval(timer);
-        setText('sys-note', 'Back online, refreshing…');
-        location.reload();
-      }
-    }).catch(function(){});           // being unreachable during a reboot is normal
-    if(tries >= 45){                  // ~90 s is enough waiting
+      if(r.ok){ clearInterval(timer); setText('sys-note','Back online, refreshing...'); location.reload() }
+    }).catch(function(){});
+    if(tries >= 45){
       clearInterval(timer);
-      setText('sys-note', 'Still not back; refresh manually or check the power');
-      btn.disabled = false;
-      btn.textContent = 'Reboot';
+      setText('sys-note','Still not back; refresh manually or check the power');
+      btn.disabled = false; btn.textContent = 'Reboot';
     }
   }, 2000);
 });
 
 // ── Init ──────────────────────────────────────────────────────────────
-// Order matters: read the capabilities first (band limit, true-peak
-// availability), then the chain and presets. The other way round would draw one
-// frame assuming "6 bands and both limiter modes", then correct itself --
-// which flickers for a user and makes tests judge an intermediate state.
+// Order: capabilities first (band limit, true-peak availability), then types and
+// presets. The other way round draws one frame assuming "6 bands and both modes".
 (async function init(){
   await loadCaps();
-  await Promise.all([loadChain(), loadPresets()]);
-  renderWizard();
-  fetchStatus();
-  connectWS();
+  await Promise.all([loadTypes(), loadPresets()]);
+  curName = types.length ? types[0].name : '';
+  curEffects = cloneEffects(curType() ? curType().effects : []);
+  renderTypes(); renderCards();
+  fetchStatus(); connectWS();
 })();
 </script>
 
