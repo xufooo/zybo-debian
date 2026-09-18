@@ -802,7 +802,7 @@ function renderSettings(){
     box.appendChild(row);
     box.appendChild(el('div','hint', !surroundAvail
       ? 'This bitstream has no DELAY slot (the hardware requirement for the sound stage): see the engine line above.'
-      : 'A copy of the V4A DiffSurround: the right channel is delayed by this many milliseconds (Haas effect). Only 1-20 ms widens the stage; past 30 ms it sounds like an echo, and 0 ms is off.'));
+      : 'A copy of the V4A DiffSurround: the right channel is delayed by this many milliseconds (Haas effect). Only 1-5 ms widens the stage (the ring on this board holds 5.3 ms); longer starts to sound like an echo, and 0 ms is off.'));
     if(!fx.enabled) box.appendChild(el('div','hint','Currently off: the values above are stored in this type and take effect once it is on.'));
     const rm = el('button','btn sm danger','✕ Remove this effect from the type');
     rm.id = 'fx-remove';
