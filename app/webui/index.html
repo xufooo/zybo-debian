@@ -301,8 +301,8 @@ const EFFECTS = [
   // Planned: the reason comes from capabilities.planned and is shown as-is
   { id:'spatial', name:'3D / headphone stage', desc:'Moves headphone sound off the top of your head',
     stage:'P2', kind:'cross' },
-  { id:'widener', name:'Stereo widening',   desc:'Wider, more enveloping image',
-    stage:'P2', requires:['widener'] },
+  { id:'surround', name:'Sound stage', desc:'The voice stops sitting in the middle: the stage opens up.',
+    stage:'P2', kind:'delay' },
 ];
 
 const STRENGTH_DB = { light: 5, mid: 8, strong: 12 };
@@ -325,6 +325,7 @@ let state = {};          // /api/status
 let caps = null;         // /api/dsp/capabilities
 let dynAvail = false;
 let crossAvail = false;
+let surroundAvail = false;
 let types = [];          // /api/dsp/types
 let curName = '';        // currently selected type
 let curEffects = [];     // this type's effects (working copy)
@@ -394,7 +395,8 @@ function normalizeFx(fx){
 function isBandFx(fx){ const d = effectDef(fx.id); return !!(d && (d.kind === 'bands' || d.requires)) }
 function isSelectableFx(fx){
   const d = effectDef(fx.id);
-  return !!(d && (d.kind === 'bands' || d.kind === 'cross' || d.requires));
+  return !!(d && (d.kind === 'bands' || d.kind === 'cross' ||
+                  d.kind === 'delay' || d.requires));
 }
 function chipEffects(){ return curEffects.filter(isSelectableFx) }
 function limiterFx(){
@@ -486,6 +488,7 @@ async function loadCaps(){
   catch(e){ caps = null; showNotice('Cannot read engine capabilities: ' + e.message) }
   dynAvail = !!(caps && caps.dyn_bass && caps.dyn_bass.available);
   crossAvail = !!(caps && caps.crossfeed && caps.crossfeed.available);
+  surroundAvail = !!(caps && caps.surround && caps.surround.available);
   if(!dynAvail) dynBass.on = false;
   renderEngineLine();
 }
@@ -765,6 +768,41 @@ function renderSettings(){
       : 'A copy of the bs2b headphone crossfeed: this side quietly gets some of the other channel low end, so the sound is less stuck inside your head.'
         + 'A lower cut sends less low end across; a larger amount sends it more faintly (6 dB is the bs2b Light setting).'
         + 'Mono content keeps the same level through it.'));
+    if(!fx.enabled) box.appendChild(el('div','hint','Currently off: the values above are stored in this type and take effect once it is on.'));
+    const rm = el('button','btn sm danger','✕ Remove this effect from the type');
+    rm.id = 'fx-remove';
+    rm.addEventListener('click', function(){
+      const i = curEffects.findIndex(function(e){ return e.id === fx.id });
+      if(i >= 0) curEffects.splice(i,1);
+      selectedFx = '';
+      dirty = true; syncCurType(); renderFx(); applyCurrent();
+    });
+    box.appendChild(rm);
+    return;
+  }
+
+  if(def && def.kind === 'delay'){
+    if(!fx.params) fx.params = {};
+    if(typeof fx.params.delay_ms !== 'number') fx.params.delay_ms = 2.5;
+    const row = el('div','ctl');
+    row.appendChild(el('span','lb','Delay'));
+    const inp = document.createElement('input');
+    inp.type = 'range'; inp.min = 0; inp.max = 20; inp.step = 0.5;
+    inp.value = String(fx.params.delay_ms);
+    inp.id = 'surround-delay';
+    inp.setAttribute('aria-label', 'Delay');
+    if(!surroundAvail) inp.disabled = true;
+    const val = el('span','val', fx.params.delay_ms.toFixed(1) + ' ms');
+    inp.addEventListener('input', function(){
+      fx.params.delay_ms = +inp.value;
+      val.textContent = fx.params.delay_ms.toFixed(1) + ' ms';
+      dirty = true; syncCurType(); applyCurrent();
+    });
+    row.appendChild(inp); row.appendChild(val);
+    box.appendChild(row);
+    box.appendChild(el('div','hint', !surroundAvail
+      ? 'This bitstream has no DELAY slot (the hardware requirement for the sound stage): see the engine line above.'
+      : 'A copy of the V4A DiffSurround: the right channel is delayed by this many milliseconds (Haas effect). Only 1-20 ms widens the stage; past 30 ms it sounds like an echo, and 0 ms is off.'));
     if(!fx.enabled) box.appendChild(el('div','hint','Currently off: the values above are stored in this type and take effect once it is on.'));
     const rm = el('button','btn sm danger','✕ Remove this effect from the type');
     rm.id = 'fx-remove';
@@ -1059,6 +1097,13 @@ async function applyNow(){
       const body = { chain: items, type: curName };
       if(dynAvail) body.dyn_bass = (dynBass.on ? { gain_db: dynBass.gain } : { off: true });
       const cfx = curEffects.find(function(e){ return e.id === 'spatial' });
+      const sfx = curEffects.find(function(e){ return e.id === 'surround' });
+      if(surroundAvail && sfx){
+        const sp = sfx.params || {};
+        body.surround = sfx.enabled
+          ? { delay_ms: (typeof sp.delay_ms === 'number' ? sp.delay_ms : 2.5) }
+          : { off: true };
+      }
       const cp = (cfx && cfx.params) || {};
       if(crossAvail && cfx) body.crossfeed = cfx.enabled
         ? { fcut_hz: (typeof cp.fcut_hz === 'number' ? cp.fcut_hz : 700),
@@ -1286,6 +1331,7 @@ $('btn-reboot').addEventListener('click', function(){
   } catch(e){}
   let savedType = '';
   let cfSaved = null;
+  let sfSaved = null;
   try {
     const ch = await api('/api/dsp/chain');
     const db = ch && ch.dyn_bass;
@@ -1293,6 +1339,7 @@ $('btn-reboot').addEventListener('click', function(){
     else if(ch) dynBass = { on: false, gain: dynBass.gain };
     if(ch && typeof ch.type === 'string') savedType = ch.type;
     cfSaved = (ch && ch.crossfeed) || null;
+    sfSaved = (ch && ch.surround) || null;
   } catch(e){}
   await Promise.all([loadTypes(), loadPresets()]);
   curName = (savedType && types.some(function(t){ return t.name === savedType }))
@@ -1306,6 +1353,14 @@ $('btn-reboot').addEventListener('click', function(){
       if(typeof cfSaved.fcut_hz === 'number') cfx.params.fcut_hz = cfSaved.fcut_hz;
       if(typeof cfSaved.feed === 'number') cfx.params.feed = cfSaved.feed;
       cfx.enabled = true;
+    }
+  }
+  if(sfSaved){
+    const sfx = curEffects.find(function(e){ return e.id === 'surround' });
+    if(sfx){
+      if(!sfx.params) sfx.params = {};
+      if(typeof sfSaved.delay_ms === 'number') sfx.params.delay_ms = sfSaved.delay_ms;
+      sfx.enabled = true;
     }
   }
   renderTypes(); renderFx();
