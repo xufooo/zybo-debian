@@ -226,17 +226,6 @@
   .strength{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
   .strength .lb{font-size:10px;color:var(--fg-dim);margin-right:2px}
 
-  
-  .pst-list{display:flex;flex-wrap:wrap;gap:6px;max-height:36vh;overflow:auto}
-  .pst-item{display:flex;align-items:center;gap:6px;background:var(--panel2);border-radius:var(--r-sm);
-            padding:7px 9px;border:1px solid transparent}
-  .pst-item.active{border-color:var(--accent)}
-  .pst-item.grey{opacity:.5}
-  .pst-item .nm{font-size:11px;font-weight:600;color:var(--fg);cursor:pointer;flex:1;min-width:0;
-                overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .pst-item.active .nm{color:var(--accent2)}
-  .pst-item .mini{font-size:9px;color:var(--fg-faint)}
-
   /* volume / status / reboot */
   .vol-panel{padding:4px 12px}
   .vol-row{display:flex;align-items:center;gap:10px}
@@ -266,7 +255,6 @@
   @media (max-width:700px){
     .player{grid-template-columns:1fr}
     .engine-line{text-align:left}
-    .pst-list{max-height:none}
   }
   @media (max-width:420px){
     body{padding:8px}
@@ -355,6 +343,12 @@
       <div class="panel">
         <div id="fx-settings"></div>
         <div class="row-wrap" id="fx-save"></div>
+        
+        <div class="row-wrap">
+          <button class="btn sm" id="btn-import" title="Import a custom JSON preset, REW text or AutoEQ text as one card in the current type">📥 Import EQ</button>
+          <a class="btn sm" id="btn-export-rew" href="/api/dsp/export?format=rew" download>📤 Export EQ (REW)</a>
+          <input type="file" id="file-import" accept=".txt,.json" style="display:none">
+        </div>
       </div>
 
       
@@ -364,19 +358,6 @@
       </div>
     </div>
 
-  </div>
-
-  
-  <div class="section-title">Genre presets</div>
-  <div class="panel">
-    <div class="pst-list" id="preset-list"></div>
-    <div class="row-wrap">
-      <button class="btn" id="btn-save-preset">💾 Save preset</button>
-      <button class="btn" id="btn-import" title="Import a custom JSON preset, REW text or AutoEQ text">📥 Import</button>
-      <a class="btn" id="btn-export-rew" href="/api/dsp/export?format=rew" download>📤 Export EQ (REW)</a>
-      <input type="file" id="file-import" accept=".txt,.json" style="display:none">
-    </div>
-    <div class="hint" id="preset-hint"></div>
   </div>
 
   
@@ -464,7 +445,6 @@ let types = [];          // /api/dsp/types
 let curName = '';        // currently selected type
 let curEffects = [];     // this type's effects (working copy)
 let selectedFx = '';     // which effect the Settings panel is showing (level-2 selection)
-let presets = [];        // genre presets
 // dirty: has the user actually CHANGED this type's settings?
 // Merely looking at a built-in type must not write it to disk, otherwise
 // tapping "Headphones" creates a same-named user type that shadows the built-in one.
@@ -1268,6 +1248,14 @@ function renderFxActions(){
     });
     acts.appendChild(add);
   }
+
+  const cur = curEffects.find(function(e){ return e.id === selectedFx }) || chipEffects()[0];
+  if(cur){
+    const del = el('button','btn sm danger','✕ Remove this card');
+    del.id = 'fx-del';
+    del.addEventListener('click', function(){ removeFx(cur) });
+    acts.appendChild(del);
+  }
   const hint = $('fx-hint');
   if(hint){
     const used = mergedChain().length;
@@ -1275,6 +1263,17 @@ function renderFxActions(){
       chipEffects().length + ' cards merge into ' + used + ' sections (limit ' + maxBands() + ')';
     hint.style.color = used > maxBands() ? '#f0a8b4' : '';
   }
+}
+
+async function removeFx(fx){
+  if(!fx) return;
+  const label = fxName(fx);
+  if(!(window.confirm && window.confirm('Remove "' + label + '" from the current type?'))) return;
+  curEffects = curEffects.filter(function(e){ return e.id !== fx.id });
+  const left = chipEffects();
+  selectedFx = left.length ? left[0].id : '';
+  dirty = true; syncCurType(); renderFx(); await applyNow();
+  showNotice('Removed from the current type "' + curName + '": "' + label + '"', 'ok');
 }
 
 // -- Pushing to the hardware (debounced) --
@@ -1347,77 +1346,26 @@ async function applyNow(){
   } catch(e){ showNotice('This type could not be saved', 'err', [e.message]) }
 }
 
-// -- Genre presets (secondary) --
-async function loadPresets(){
-  try {
-    const d = await api('/api/dsp/presets');
-    presets = d.presets || [];
-    renderPresets();
-  } catch(e){
-    presets = [];
-    showNotice('Cannot read the preset list: ' + e.message);
-  }
-  const hint = $('preset-hint');
-  if(hint){
-    const nb = caps && caps.presets ? caps.presets.builtin : null;
-    hint.textContent = (nb === 0 || nb === null)
-      ? 'No built-in library installed -- a packaging matter, not a broken UI'
-      : 'Built-in ' + caps.presets.builtin + ' + mine ' + (caps.presets.user || 0) +
-        '. Applying a genre preset replaces the current chain (your types are untouched).';
-  }
-}
-function renderPresets(){
-  const box = $('preset-list');
-  if(!box) return;
-  box.innerHTML = '';
-  presets.forEach(function(p){ box.appendChild(presetItem(p)) });
-  if(!presets.length) box.appendChild(el('div','hint','No presets available yet'));
-}
-function presetItem(p){
-  const item = el('div','pst-item' + (!p.usable ? ' grey' : ''));
-  item.dataset.preset = p.name; item.dataset.usable = p.usable ? '1' : '0';
-  const nm = el('div','nm', p.name);
-  nm.title = (p.why && p.why.length) ? p.why.join('; ') : (p.note || (p.bands + ' bands'));
-  if(p.usable) nm.addEventListener('click', function(){ applyPreset(p.name) });
-  else nm.addEventListener('click', function(){
-    showNotice('"' + p.name + '" is not usable yet', 'warn', p.why || ['needs a newer engine']);
-  });
-  item.appendChild(nm);
-  item.appendChild(el('div','mini', p.usable ? (p.bands + 'bd') : (p.stage || 'planned')));
-  return item;
-}
-async function applyPreset(name){
-  try {
-    const d = await postJSON('/api/dsp/presets/apply', { name:name });
-    if(typeof d.preamp_db === 'number' && d.preamp_db < -0.05){
-      showNotice('Applied "' + name + '". Level reduced by ' + Math.abs(d.preamp_db).toFixed(1) + ' dB to avoid clipping', 'ok');
-    } else showNotice('Applied "' + name + '"', 'ok');
-  } catch(e){
-    if(e.status === 409) showNotice('This preset is not usable yet (engine too small)', 'warn', [e.message]);
-    else showNotice('Could not apply the preset', 'err', [e.message]);
-  }
-}
-async function savePreset(){
-  const name = (window.prompt && window.prompt('Preset name?', 'My sound')) || '';
-  if(!name.trim()) return;
-  try {
-    await postJSON('/api/dsp/presets', { name:name.trim() });
-    showNotice('Saved as "' + name.trim() + '"', 'ok');
-    await loadPresets();
-  } catch(e){ showNotice('Save failed', 'err', [e.message]) }
-}
 async function importFile(file){
   const text = await file.text();
-  const base = file.name.replace(/\.[^.]+$/, '');
+  const base = (file.name || '').replace(/\.[^.]+$/, '') || 'Imported EQ';
   try {
-    const d = await api('/api/dsp/presets/import?name=' + encodeURIComponent(base), {
-      method:'POST', headers:{'Content-Type':'application/json'}, body:text });
+    const d = await api('/api/dsp/eq/parse?name=' + encodeURIComponent(base),
+      { method:'POST', headers:{'Content-Type':'application/json'}, body:text });
+    const got = (d.bands || []).map(function(b){
+      return { type: b.type || 'peq', enabled:true, freq:+b.freq, gain_db:+b.gain_db, q:+b.q };
+    });
+    if(!got.length) throw new Error('this file has no usable filter bands');
+    const fx = { id:'u_' + Date.now().toString(36), name:base, kind:'bands',
+                 enabled:true, mode:'mid', params:{}, bands: [] };
+    fx.bands = normalizeBands(got, null, 'mid');
+    curEffects.push(fx);
+    selectedFx = fx.id;
+    dirty = true; syncCurType(); renderFx(); await applyNow();
     const warns = (d.warnings || []).slice();
-    if(d.apply_error) warns.push('Saved as a preset, but not applied to the hardware: ' + d.apply_error);
-    if(warns.length) showNotice('Import finished with ' + warns.length + ' thing(s) to report', 'warn', warns);
-    else showNotice('Import finished' + (d.preset ? ': ' + d.preset.name : ''), 'ok');
-    await loadPresets();
-  } catch(e){ showNotice(e.message, 'err', []) }
+    if(warns.length) showNotice('Imported as one card "' + fx.name + '", with ' + warns.length + ' notes for you', 'warn', warns);
+    else showNotice('Imported as one card "' + fx.name + '" (inside the current type "' + curName + '")', 'ok');
+  } catch(e){ showNotice('Import failed', 'err', [e.message]) }
 }
 
 // -- Status (WebSocket / polling) --
@@ -1493,7 +1441,6 @@ $('vol-slider').addEventListener('input', function(){
   }, 150);
 });
 
-$('btn-save-preset').addEventListener('click', savePreset);
 $('btn-import').addEventListener('click', function(){ $('file-import').click() });
 $('file-import').addEventListener('change', function(){
   const f = this.files && this.files[0];
@@ -1563,7 +1510,7 @@ $('btn-reboot').addEventListener('click', function(){
     cfSaved = (ch && ch.crossfeed) || null;
     sfSaved = (ch && ch.surround) || null;
   } catch(e){}
-  await Promise.all([loadTypes(), loadPresets()]);
+  await loadTypes();
   curName = (savedType && types.some(function(t){ return t.name === savedType }))
     ? savedType
     : (types.length ? types[0].name : '');
