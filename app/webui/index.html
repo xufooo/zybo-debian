@@ -126,12 +126,11 @@
                  text-transform:uppercase;margin:0;padding-left:3px}
   .stage>.section-title::before{counter-increment:stage;
                  content:counter(stage) '. ';color:var(--accent);font-weight:700}
-  
-  .sub-title{font-size:10px;color:var(--fg-faint);letter-spacing:3px;
-             text-transform:uppercase;margin-bottom:8px}
   .panel{background:var(--panel);border:1px solid var(--line);
          border-radius:var(--radius);padding:12px;box-shadow:var(--shadow);min-width:0}
   .hint{font-size:10px;color:var(--fg-faint);line-height:1.5;margin-top:6px}
+  .hint.bad{color:var(--err-fg)}
+  .card .source-badge.live{background:var(--panel3);color:var(--accent2)}
   .row-wrap{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;
        padding:8px 12px;min-height:32px;border-radius:var(--r-sm);
@@ -228,6 +227,13 @@
 
   /* volume / status / reboot */
   .vol-panel{padding:4px 12px}
+  .bypass-row{border-top:1px solid var(--line);padding:6px 0 2px;gap:8px}
+  .bypass-row .lb{min-width:auto;font-size:11px;color:var(--fg-dim)}
+  .bypass-note{font-size:10px;color:var(--warm);flex:1;text-align:right}
+  
+  .app[data-bypass="1"] .stages{opacity:.5}
+  .app[data-bypass="1"] .stages>.stage>.section-title::after{
+    content:' · bypassed';color:var(--warm);font-weight:600}
   .vol-row{display:flex;align-items:center;gap:10px}
   .vol-row .icon{font-size:18px;opacity:.85}
   /* Same for the volume slider: tall hit area, thin track */
@@ -301,6 +307,13 @@
       </div>
 
       <div class="panel vol-panel">
+        
+        <div class="ctl bypass-row">
+          <span class="lb">Bypass</span>
+          <button class="fx-sw" id="bypass-sw" aria-label="Bypass on/off"></button>
+          <span class="sw-state" id="bypass-state">Off</span>
+          <span class="bypass-note" id="bypass-note"></span>
+        </div>
         <div class="vol-row">
           <span class="icon">🔈</span>
           <input type="range" id="vol-slider" min="-60" max="0" value="-12" step="1">
@@ -349,12 +362,7 @@
           <a class="btn sm" id="btn-export-rew" href="/api/dsp/export?format=rew" download>📤 Export EQ (REW)</a>
           <input type="file" id="file-import" accept=".txt,.json" style="display:none">
         </div>
-      </div>
 
-      
-      <div class="panel">
-        <div class="sub-title">Chain level</div>
-        <div id="global-settings"></div>
       </div>
     </div>
 
@@ -363,6 +371,8 @@
   
   <div class="section-title">Device</div>
   <div class="panel">
+    
+    <div id="global-settings"></div>
     <div class="status-bar" id="status-bar">
       <span>CPU <span id="sys-cpu">--</span>%</span>
       <span>RAM <span id="sys-ram">--</span>MB</span>
@@ -418,6 +428,8 @@ const EFFECTS = [
     stage:'P2', kind:'cross' },
   { id:'surround', name:'Sound stage', desc:'The voice stops sitting in the middle: the stage opens up.',
     stage:'P2', kind:'delay' },
+  { id:'dyn', name:'Dynamic bass', desc:'More low-end weight at low volume', stage:'P0', kind:'dyn' },
+  { id:'limiter', name:'Peak limiter', desc:'Stops clipping, protects the speakers', stage:'P0', kind:'limiter' },
 ];
 
 const STRENGTH_DB = { light: 5, mid: 8, strong: 12 };
@@ -451,11 +463,6 @@ let selectedFx = '';     // which effect the Settings panel is showing (level-2 
 let dirty = false;
 let appliedPreamp = 0;
 let chainGainDB = 0;
-let dynBass = { on: false, gain: 6 };
-try {
-  const v = JSON.parse(localStorage.getItem('zybo_dynbass') || 'null');
-  if (v && typeof v.on === 'boolean') dynBass = { on: v.on, gain: Math.max(0, Math.min(12, +v.gain || 6)) };
-} catch(e){}
 try { const v = parseFloat(localStorage.getItem('zybo_gain_db')); if (isFinite(v)) chainGainDB = Math.max(0, Math.min(12, v)) } catch(e){}
 const API = '';
 
@@ -523,17 +530,10 @@ function normalizeFx(fx){
 function isBandFx(fx){ return fxKind(fx) === 'bands' || fxRequires(fx) }
 function isSelectableFx(fx){
   const k = fxKind(fx);
-  return !!(k === 'bands' || k === 'cross' || k === 'delay' || fxRequires(fx));
+  return !!(k === 'bands' || k === 'cross' || k === 'delay' ||
+            k === 'dyn' || k === 'limiter' || fxRequires(fx));
 }
 function chipEffects(){ return curEffects.filter(isSelectableFx) }
-function limiterFx(){
-  let fx = curEffects.find(function(e){ return e.id === 'limiter' });
-  if(!fx){
-    fx = { id:'limiter', enabled:true, mode: truepeakAvailable() ? 'truepeak' : 'feedback',
-           params:{ thr_db:-1, att_ms:0.09, rel_ms:43 }, bands:[] };
-  }
-  return fx;
-}
 function mergedChain(){
   const acc = GRID.map(function(f, i){ return { freq:f, q:GRID_Q[i], gain_db:0, w:0 } });
   curEffects.forEach(function(fx){
@@ -616,7 +616,6 @@ async function loadCaps(){
   dynAvail = !!(caps && caps.dyn_bass && caps.dyn_bass.available);
   crossAvail = !!(caps && caps.crossfeed && caps.crossfeed.available);
   surroundAvail = !!(caps && caps.surround && caps.surround.available);
-  if(!dynAvail) dynBass.on = false;
   renderEngineLine();
 }
 
@@ -638,6 +637,20 @@ function curType(){ return types.find(function(t){ return t.name === curName }) 
 let BUILTIN_NAMES = [];
 
 // Deep-copy effects into a working copy (never mutate the objects inside `types`)
+function withRequiredCards(list){
+  const out = cloneEffects(list);
+  if(!out.some(function(e){ return e.id === 'limiter' })){
+    out.push({ id:'limiter', name:'Peak limiter', kind:'limiter', enabled:true,
+               mode: truepeakAvailable() ? 'truepeak' : 'feedback',
+               params:{ thr_db:-1, att_ms:0.09, rel_ms:43 }, bands: [] });
+  }
+  if(!out.some(function(e){ return e.id === 'dyn' })){
+    out.push({ id:'dyn', name:'Dynamic bass', kind:'dyn', enabled:false, mode:'',
+               params:{ gain_db:6 }, bands: [] });
+  }
+  return out;
+}
+
 function cloneEffects(list){
   return (list || []).map(function(e){
     const fx = { id:e.id, name:e.name || '', kind:e.kind || '', desc:e.desc || '',
@@ -712,7 +725,7 @@ async function selectType(name){
   const t = types.find(function(x){ return x.name === name });
   if(!t) return;
   curName = name;
-  curEffects = cloneEffects(t.effects);
+  curEffects = withRequiredCards(t.effects);
   selectedFx = curEffects.length ? curEffects[0].id : '';   // first effect of the new type
   dirty = false;        // just looking: apply its settings, do not save
   renderTypes(); renderFx();
@@ -762,7 +775,7 @@ async function renameType(){
     await postJSON('/api/dsp/types/rename', { from:t.name, to:to.trim() });
     await loadTypes();
     curName = to.trim();
-    curEffects = cloneEffects(curType() ? curType().effects : []);
+    curEffects = withRequiredCards(curType() ? curType().effects : []);
     renderTypes(); renderFx();
     showNotice('Renamed to "' + curName + '"', 'ok');
   } catch(e){ showNotice('Rename failed', 'err', [e.message]) }
@@ -776,7 +789,7 @@ async function deleteType(){
     await postJSON('/api/dsp/types/delete', { name:t.name });
     await loadTypes();
     curName = types.length ? types[0].name : '';
-    curEffects = cloneEffects(curType() ? curType().effects : []);
+    curEffects = withRequiredCards(curType() ? curType().effects : []);
     renderTypes(); renderFx(); await applyNow();
     showNotice('Deleted', 'ok');
   } catch(e){ showNotice('Delete failed', 'err', [e.message]) }
@@ -791,7 +804,7 @@ async function restoreBuiltin(){
     await postJSON('/api/dsp/types/delete', { name:t.name });
     await loadTypes();
     const back = types.find(function(x){ return x.name === t.name });
-    curEffects = cloneEffects(back ? back.effects : []);
+    curEffects = withRequiredCards(back ? back.effects : []);
     renderTypes(); renderFx(); await applyNow();
     showNotice('Restored the built-in settings', 'ok');
   } catch(e){ showNotice('Restore failed', 'err', [e.message]) }
@@ -828,6 +841,10 @@ function renderChips(){
     box.appendChild(chip);
   });
   if(!curEffects.length) box.appendChild(el('div','hint','This type has no effects yet; add one with "+ Add a card" below'));
+}
+
+function fxOffHint(box, fx){
+  if(!fx.enabled) box.appendChild(el('div','hint','Currently off: the values above are stored in this type and take effect once it is on.'));
 }
 
 function renderSettings(){
@@ -902,16 +919,7 @@ function renderSettings(){
       : 'A copy of the bs2b headphone crossfeed: this side quietly gets some of the other channel low end, so the sound is less stuck inside your head.'
         + 'A lower cut sends less low end across; a larger amount sends it more faintly (6 dB is the bs2b Light setting).'
         + 'Mono content keeps the same level through it.'));
-    if(!fx.enabled) box.appendChild(el('div','hint','Currently off: the values above are stored in this type and take effect once it is on.'));
-    const rm = el('button','btn sm danger','✕ Remove this effect from the type');
-    rm.id = 'fx-remove';
-    rm.addEventListener('click', function(){
-      const i = curEffects.findIndex(function(e){ return e.id === fx.id });
-      if(i >= 0) curEffects.splice(i,1);
-      selectedFx = '';
-      dirty = true; syncCurType(); renderFx(); applyCurrent();
-    });
-    box.appendChild(rm);
+    fxOffHint(box, fx);
     return;
   }
 
@@ -937,16 +945,48 @@ function renderSettings(){
     box.appendChild(el('div','hint', !surroundAvail
       ? 'This bitstream has no DELAY slot (the hardware requirement for the sound stage): see the engine line above.'
       : 'A copy of the V4A DiffSurround: the right channel is delayed by this many milliseconds (Haas effect). Only 1-5 ms widens the stage (the ring on this board holds 5.3 ms); longer starts to sound like an echo, and 0 ms is off.'));
-    if(!fx.enabled) box.appendChild(el('div','hint','Currently off: the values above are stored in this type and take effect once it is on.'));
-    const rm = el('button','btn sm danger','✕ Remove this effect from the type');
-    rm.id = 'fx-remove';
-    rm.addEventListener('click', function(){
-      const i = curEffects.findIndex(function(e){ return e.id === fx.id });
-      if(i >= 0) curEffects.splice(i,1);
-      selectedFx = '';
-      dirty = true; syncCurType(); renderFx(); applyCurrent();
+    fxOffHint(box, fx);
+    return;
+  }
+
+  if(kind === 'dyn'){
+    if(!fx.params) fx.params = {};
+    if(typeof fx.params.gain_db !== 'number') fx.params.gain_db = 6;
+    const r = el('div','ctl');
+    r.appendChild(el('span','lb','Bass boost'));
+    const inp = document.createElement('input');
+    inp.type = 'range'; inp.min = 0; inp.max = 12; inp.step = 1;
+    inp.value = String(fx.params.gain_db);
+    inp.id = 'dynbass-gain';
+    inp.setAttribute('aria-label', 'Dynamic bass amount');
+    if(!dynAvail) inp.disabled = true;
+    const val = el('span','val', '+' + fx.params.gain_db.toFixed(0) + ' dB');
+    inp.addEventListener('input', function(){
+      fx.params.gain_db = +inp.value;
+      val.textContent = '+' + fx.params.gain_db.toFixed(0) + ' dB';
+      dirty = true; syncCurType(); applyCurrent();
     });
-    box.appendChild(rm);
+    r.appendChild(inp); r.appendChild(val);
+    box.appendChild(r);
+    box.appendChild(el('div','hint', !dynAvail
+      ? 'This bitstream has no dynamic bass (it needs the 0.2 bitstream): see the engine line above.'
+      : 'Works with the signal level: quiet passages get up to ' + fx.params.gain_db.toFixed(0) +
+        ' dB more low end, and loud ones are held back (so it never pulls the overall level down).'));
+    fxOffHint(box, fx);
+    return;
+  }
+
+  if(kind === 'limiter'){
+    if(!fx.params) fx.params = {};
+    renderLimiterControls(box, fx);
+    box.appendChild(el('div','hint',
+      'A safety stage at the end of the chain that stops clipping. It is a card of this type too: switching types swaps the whole set, so every type carries its own.'));
+    fxOffHint(box, fx);
+    return;
+  }
+  if(kind !== 'bands'){
+    box.appendChild(el('div','hint','This card has no adjustable values.'));
+    fxOffHint(box, fx);
     return;
   }
 
@@ -972,20 +1012,7 @@ function renderSettings(){
   g.appendChild(el('span','lb','Q'));
   box.appendChild(g);
   fx.bands.forEach(function(band, i){ box.appendChild(gridRow(band, i, grey)) });
-  if(!fx.enabled){
-    box.appendChild(el('div','hint','Currently off: the values above are stored in this type and take effect once it is on.'));
-  }
-  if(!grey){
-    const rm = el('button','btn sm danger','✕ Remove this effect from the type');
-    rm.id = 'fx-remove';
-    rm.addEventListener('click', function(){
-      const i = curEffects.findIndex(function(e){ return e.id === fx.id });
-      if(i >= 0) curEffects.splice(i,1);
-      selectedFx = '';
-      dirty = true; syncCurType(); renderFx(); applyCurrent();
-    });
-    box.appendChild(rm);
-  }
+  fxOffHint(box, fx);
 }
 
 function gridRow(band, i, grey){
@@ -1086,66 +1113,11 @@ function renderGlobal(){
 
   const r = el('div','ctl');
   r.appendChild(el('span','lb','Overall headroom'));
-  const v = el('span','val', appliedPreamp <= -0.05 ? appliedPreamp.toFixed(1) + ' dB' : '0 dB');
-  r.appendChild(v);
+  r.appendChild(el('span','val', appliedPreamp <= -0.05 ? appliedPreamp.toFixed(1) + ' dB' : '0 dB'));
   box.appendChild(r);
   box.appendChild(el('div','hint', appliedPreamp <= -0.05
-    ? 'Boosted bands push peaks past full scale, so the chain is attenuated by the largest boost first (same rule as EqualizerAPO Preamp / EasyEffects Auto Gain).'
+    ? 'Bands with boost would push peaks past full scale, so the whole chain is trimmed by the largest boost -- an automatically computed read-out, not a setting.'
     : 'This chain has no boost (or it is inside the dead zone), so nothing is attenuated.'));
-
-  const dRow = el('div','ctl');
-  dRow.appendChild(el('span','lb','Dynamic bass'));
-  const dSw = el('button','fx-sw' + (dynBass.on && dynAvail ? ' on' : ''));
-  dSw.id = 'dynbass-sw';
-  dSw.setAttribute('aria-label', 'Dynamic bass on/off');
-  if(!dynAvail) dSw.disabled = true;
-  else dSw.addEventListener('click', function(){
-    dynBass.on = !dynBass.on;
-    try { localStorage.setItem('zybo_dynbass', JSON.stringify(dynBass)) } catch(e){}
-    renderGlobal(); applyCurrent();
-  });
-  dRow.appendChild(dSw);
-  dRow.appendChild(el('span','sw-state', (dynBass.on && dynAvail) ? 'on' : 'off'));
-  box.appendChild(dRow);
-  const gRow = el('div','ctl');
-  gRow.appendChild(el('span','lb','Bass boost'));
-  const din = document.createElement('input');
-  din.type = 'range'; din.min = 0; din.max = 12; din.step = 1;
-  din.value = String(dynBass.gain);
-  din.id = 'dynbass-gain';
-  din.setAttribute('aria-label', 'Dynamic bass amount');
-  if(!dynAvail) din.disabled = true;
-  const dval = el('span','val', '+' + dynBass.gain.toFixed(0) + ' dB');
-  din.addEventListener('input', function(){
-    dynBass.gain = +din.value;
-    dval.textContent = '+' + dynBass.gain.toFixed(0) + ' dB';
-    try { localStorage.setItem('zybo_dynbass', JSON.stringify(dynBass)) } catch(e){}
-    applyCurrent();
-  });
-  gRow.appendChild(din); gRow.appendChild(dval);
-  box.appendChild(gRow);
-  box.appendChild(el('div','hint', !dynAvail
-    ? 'This bitstream has no dynamic bass (it needs the 0.2 bitstream): see the engine line above.'
-    : (dynBass.on
-      ? ('Dynamic bass on: quiet passages are lifted by up to ' + dynBass.gain.toFixed(0) + ' dB and it backs off when loud (so it never shrinks the whole mix).')
-      : 'Dynamic bass is off. Turn it on: quiet passages get more low end, loud ones are not pushed over.')));
-
-  const lim = limiterFx();
-  const swRow = el('div','ctl');
-  swRow.appendChild(el('span','lb','Peak limiter'));
-  const sw = el('button','fx-sw' + (lim.enabled ? ' on' : ''));
-  sw.id = 'lim-sw';
-  sw.setAttribute('aria-label', 'Peak limiter on/off');
-  sw.addEventListener('click', function(){
-    lim.enabled = !lim.enabled; dirty = true; syncCurType(); renderGlobal(); applyCurrent();
-  });
-  swRow.appendChild(sw);
-  swRow.appendChild(el('span','sw-state', lim.enabled ? 'on' : 'off'));
-  box.appendChild(swRow);
-
-  const body = el('div','set-body');
-  renderLimiterControls(body, lim);
-  box.appendChild(body);
 }
 
 // One row = label + slider + value. Dragging only updates the value cell
@@ -1261,7 +1233,7 @@ function renderFxActions(){
     const used = mergedChain().length;
     hint.textContent = 'These cards belong to type "' + curName + '": ' +
       chipEffects().length + ' cards merge into ' + used + ' sections (limit ' + maxBands() + ')';
-    hint.style.color = used > maxBands() ? '#f0a8b4' : '';
+    hint.classList.toggle('bad', used > maxBands());
   }
 }
 
@@ -1295,7 +1267,10 @@ async function applyNow(){
   } else {
     try {
       const body = { chain: items, type: curName };
-      if(dynAvail) body.dyn_bass = (dynBass.on ? { gain_db: dynBass.gain } : { off: true });
+      const dynFx = curEffects.find(function(e){ return e.id === 'dyn' });
+      if(dynAvail) body.dyn_bass = (dynFx && dynFx.enabled)
+        ? { gain_db: (dynFx.params && typeof dynFx.params.gain_db === 'number') ? dynFx.params.gain_db : 6 }
+        : { off: true };
       const cfx = curEffects.find(function(e){ return e.id === 'spatial' });
       const sfx = curEffects.find(function(e){ return e.id === 'surround' });
       if(surroundAvail && sfx){
@@ -1323,12 +1298,12 @@ async function applyNow(){
     }
   }
 
-  const lim = limiterFx();
+  const lim = curEffects.find(function(e){ return e.id === 'limiter' });
   try {
-    const p = lim.params || {};
+    const p = (lim && lim.params) || {};
     await postJSON('/api/dsp/limiter', {
-      enabled: !!lim.enabled,
-      mode: lim.mode || 'feedback',
+      enabled: !!(lim && lim.enabled),
+      mode: (lim && lim.mode) || 'feedback',
       thr_db: (typeof p.thr_db === 'number') ? p.thr_db : -1,
     });
   } catch(e){ showNotice('Limiter setting failed', 'err', [e.message]) }
@@ -1387,7 +1362,7 @@ function renderStatus(){
     state.playing ? ((SRC_LABEL[state.source]||state.source)+' playing') :
     (SRC_HINT[state.source]||'Waiting for playback'));
   $('source-badge').textContent = state.source==='idle' ? 'Idle' : (SRC_LABEL[state.source]||state.source);
-  $('source-badge').style.background = state.source==='idle'?'#25253e':'#2a2a4e';
+  $('source-badge').classList.toggle('live', state.source !== 'idle');
 
   ['idle','airplay','dlna','bluetooth'].forEach(function(s){
     const e = $('src-'+s);
@@ -1407,7 +1382,29 @@ function renderStatus(){
   setText('sys-cpu', state.system.cpu_percent);
   setText('sys-ram', state.system.mem_used_mb);
   setText('sys-uptime', fmtUptime(state.system.uptime_sec));
+  const bp = !!(state.dsp && state.dsp.bypass);
+  if(bp !== bypassState){ bypassState = bp; renderBypass() }
 }
+let bypassState = false;
+function renderBypass(){
+  const sw = $('bypass-sw');
+  if(!sw) return;
+  sw.className = 'fx-sw' + (bypassState ? ' on' : '');
+  setText('bypass-state', bypassState ? 'On' : 'Off');
+  setText('bypass-note', bypassState ? 'Bypassed: the three blocks below do not apply right now (every value is kept)' : '');
+  const app = document.querySelector('.app');
+  if(app) app.setAttribute('data-bypass', bypassState ? '1' : '0');
+}
+async function setBypass(on){
+  try {
+    await postJSON('/api/dsp/bypass', { bypass: !!on });
+    bypassState = !!on;
+    renderBypass();
+    showNotice(bypassState ? 'Bypassed: the effect chain steps aside (no setting was lost)'
+                           : 'Bypass off: the effect chain is back', 'ok');
+  } catch(e){ showNotice('The bypass switch did not take effect', 'err', [e.message]) }
+}
+
 function fmtDB(db, pct){
   if(pct <= 0) return 'Muted';
   return (db > 0 ? '+' : '') + db.toFixed(0) + ' dB';
@@ -1441,6 +1438,7 @@ $('vol-slider').addEventListener('input', function(){
   }, 150);
 });
 
+$('bypass-sw').addEventListener('click', function(){ setBypass(!bypassState) });
 $('btn-import').addEventListener('click', function(){ $('file-import').click() });
 $('file-import').addEventListener('change', function(){
   const f = this.files && this.files[0];
@@ -1503,9 +1501,6 @@ $('btn-reboot').addEventListener('click', function(){
   let sfSaved = null;
   try {
     const ch = await api('/api/dsp/chain');
-    const db = ch && ch.dyn_bass;
-    if(db) dynBass = { on: true, gain: Math.max(0, Math.min(12, +db.gain_db || 6)) };
-    else if(ch) dynBass = { on: false, gain: dynBass.gain };
     if(ch && typeof ch.type === 'string') savedType = ch.type;
     cfSaved = (ch && ch.crossfeed) || null;
     sfSaved = (ch && ch.surround) || null;
@@ -1514,7 +1509,7 @@ $('btn-reboot').addEventListener('click', function(){
   curName = (savedType && types.some(function(t){ return t.name === savedType }))
     ? savedType
     : (types.length ? types[0].name : '');
-  curEffects = cloneEffects(curType() ? curType().effects : []);
+  curEffects = withRequiredCards(curType() ? curType().effects : []);
   if(cfSaved){
     const cfx = curEffects.find(function(e){ return e.id === 'spatial' });
     if(cfx){
@@ -1533,6 +1528,7 @@ $('btn-reboot').addEventListener('click', function(){
     }
   }
   renderTypes(); renderFx();
+  renderBypass();
   fetchStatus(); connectWS();
 })();
 </script>
