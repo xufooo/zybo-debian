@@ -5,125 +5,217 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#1a1a2e">
 <title>ZYBO Audio</title>
+<script>try{var t=localStorage.getItem('zybo_theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+  
+  :root,[data-theme="dark"]{
+    --bg:#0f0f1a; --panel:#1a1a2e; --panel2:#25253e; --panel3:#1a1a3e;
+    --fg:#e6e6f0; --fg-dim:#9a9ab0; --fg-faint:#7f849b;
+    --accent:#7c8aff; --accent2:#a8b0ff; --accent-bg:#1a1a3e;
+    --line:#25253e; --track:#25253e; --knob:#ffffff;
+    --danger:#c4646e; --warm:#c9a06a;
+    --err-fg:#f0a8b4; --err-bg:#3a2530; --err-bd:#5c3540;
+    --warn-fg:#e8cf9a; --warn-bg:#3a3525; --warn-bd:#5c5232;
+    --ok-fg:#9fd8b4; --ok-bg:#223a2c; --ok-bd:#2f5540;
+    --sw-off:#25253e; --sw-on:#3d5a8a; --sw-knob:#8f95a8;
+    --shadow:0 8px 24px rgba(0,0,0,.30);
+    --radius:14px; --r-sm:9px; --r-xs:7px;
+  }
+  
+  [data-theme="light"]{
+    --bg:#eef0f6; --panel:#ffffff; --panel2:#e9ecf5; --panel3:#e2e8ff;
+    --fg:#1b1d29; --fg-dim:#5b6076; --fg-faint:#5f6478;
+    --accent:#4757d8; --accent2:#3a48b8; --accent-bg:#e6eaff;
+    --line:#dde1ec; --track:#dde1ec; --knob:#ffffff;
+    --danger:#b93b47; --warm:#8a5c12;
+    --err-fg:#8c1f2e; --err-bg:#fdeaed; --err-bd:#f3c3cb;
+    --warn-fg:#7a5410; --warn-bg:#fdf4e0; --warn-bd:#f0dcae;
+    --ok-fg:#1c6b42; --ok-bg:#e7f7ee; --ok-bd:#bde4ce;
+    --sw-off:#dde1ec; --sw-on:#7f8ce8; --sw-knob:#ffffff;
+    --shadow:0 6px 18px rgba(30,40,90,.10);
+  }
+  
+  [data-theme="contrast"]{
+    --bg:#000000; --panel:#0c0c0c; --panel2:#1c1c1c; --panel3:#002028;
+    --fg:#ffffff; --fg-dim:#d6d6d6; --fg-faint:#b0b0b0;
+    --accent:#00e0ff; --accent2:#7df0ff; --accent-bg:#002028;
+    --line:#4a4a4a; --track:#4a4a4a; --knob:#00e0ff;
+    --danger:#ff6b7a; --warm:#ffc94d;
+    --err-fg:#ffd0d6; --err-bg:#360008; --err-bd:#a80024;
+    --warn-fg:#ffe6a8; --warn-bg:#332700; --warn-bd:#8a6a00;
+    --ok-fg:#b6ffd0; --ok-bg:#002a14; --ok-bd:#008a48;
+    --sw-off:#1c1c1c; --sw-on:#00708a; --sw-knob:#ffffff;
+    --shadow:none;
+  }
+  
+  [data-theme="warm"]{
+    --bg:#16110d; --panel:#221a14; --panel2:#30251c; --panel3:#3a2a1c;
+    --fg:#f2e6d8; --fg-dim:#c8b4a0; --fg-faint:#a08a72;
+    --accent:#e8a860; --accent2:#ffcb92; --accent-bg:#3a2a1c;
+    --line:#3a2c22; --track:#3a2c22; --knob:#fff3e0;
+    --danger:#e08a7a; --warm:#e8b06a;
+    --err-fg:#f6c4b4; --err-bg:#3a211a; --err-bd:#63372a;
+    --warn-fg:#f0d29a; --warn-bg:#3a2f1c; --warn-bd:#63512f;
+    --ok-fg:#c2dfa8; --ok-bg:#26301c; --ok-bd:#42552f;
+    --sw-off:#30251c; --sw-on:#8a5a2c; --sw-knob:#c8b4a0;
+    --shadow:0 8px 24px rgba(0,0,0,.35);
+  }
+
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
-       background:#0f0f1a;color:#e0e0e0;min-height:100vh;
-       display:flex;justify-content:center;padding:12px;
+       background:var(--bg);color:var(--fg);min-height:100vh;
+       display:flex;justify-content:center;padding:14px;
+       transition:background .15s,color .15s;
        -webkit-tap-highlight-color:transparent}
-  .app{width:100%;max-width:440px;display:flex;flex-direction:column;gap:14px}
 
-  /* header */
-  .header{text-align:center;padding:4px 0;
-          font-size:13px;color:#9a9ab0;letter-spacing:2px;text-transform:uppercase}
-  .header #app-ver{font-size:10px;letter-spacing:1px;color:#8f95a8}
+  
+  .app{width:100%;max-width:820px;display:flex;flex-direction:column;gap:14px}
+
+  
+  .topbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+          padding:0 2px}
+  .brand{font-size:13px;font-weight:700;color:var(--fg-dim);letter-spacing:3px;
+         text-transform:uppercase;white-space:nowrap}
+  .brand #app-ver{font-size:10px;letter-spacing:1px;color:var(--fg-faint);font-weight:600}
   /* Engine self-description: every "is this available" decision comes from here */
-  .engine-line{text-align:center;font-size:10px;color:#7d8299;line-height:1.5}
-  .engine-line b{color:#8f95a8;font-weight:600}
+  .engine-line{flex:1;min-width:140px;font-size:10px;color:var(--fg-faint);
+               line-height:1.5;text-align:right}
+  .engine-line b{color:var(--fg-dim);font-weight:600}
+  .theme-box{display:flex;align-items:center;gap:4px;background:var(--panel);
+             border:1px solid var(--line);border-radius:var(--r-xs);padding:1px 6px}
+  .theme-box select{background:transparent;border:none;color:var(--fg-dim);
+             font-size:11px;font-weight:600;padding:5px 2px;min-height:26px;
+             cursor:pointer;outline:none}
+  .theme-box select option{background:var(--panel);color:var(--fg)}
 
-  /* now-playing */
-  .card{background:#1a1a2e;border-radius:14px;padding:16px;text-align:center}
-  .card .art{width:80px;height:80px;border-radius:12px;background:#25253e;
-             margin:0 auto 12px;display:flex;align-items:center;justify-content:center;
-             font-size:36px}
-  .card .title{font-size:16px;font-weight:600;margin-bottom:4px;
-                white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .card .artist{font-size:13px;color:#999}
-  .card .source-badge{display:inline-block;margin-top:8px;padding:3px 10px;
-                       border-radius:12px;font-size:11px;font-weight:600;
-                       background:#25253e;color:#7c8aff}
+  
+  .player{display:grid;gap:14px;grid-template-columns:minmax(240px,300px) minmax(0,1fr)}
+  .player-side{display:flex;flex-direction:column;gap:10px;min-width:0}
 
-  /* source selector */
-  .source-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
-  .src-btn{flex:1;min-width:70px;padding:10px 4px;border-radius:10px;
-            background:#1a1a2e;border:2px solid transparent;
-            color:#999;font-size:12px;font-weight:600;cursor:pointer;
+  .card{background:var(--panel);border:1px solid var(--line);
+        border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)}
+  .card.np{display:flex;align-items:center;gap:14px}
+  .card .art{width:72px;height:72px;flex:0 0 auto;border-radius:12px;
+             background:var(--panel2);display:flex;align-items:center;
+             justify-content:center;font-size:32px}
+  .np-body{min-width:0;display:flex;flex-direction:column;gap:3px}
+  .card .title{font-size:16px;font-weight:700;white-space:nowrap;
+                overflow:hidden;text-overflow:ellipsis}
+  .card .artist{font-size:12px;color:var(--fg-dim);white-space:nowrap;
+                overflow:hidden;text-overflow:ellipsis}
+  .card .source-badge{display:inline-block;margin-top:5px;padding:3px 10px;
+                       border-radius:12px;font-size:11px;font-weight:700;
+                       background:var(--panel2);color:var(--accent)}
+
+  
+  .source-row{display:flex;gap:8px;flex-wrap:wrap}
+  .src-btn{flex:1 1 68px;padding:10px 4px;min-height:40px;border-radius:var(--r-sm);
+            background:var(--panel);border:1px solid var(--line);
+            color:var(--fg-dim);font-size:12px;font-weight:600;cursor:pointer;
             transition:all .15s;text-align:center}
-  .src-btn.active{border-color:#7c8aff;color:#7c8aff;background:#1a1a3e}
-  .src-btn:active{transform:scale(.96)}
+  .src-btn.active{border-color:var(--accent);color:var(--accent2);background:var(--accent-bg)}
+  .src-btn:active{transform:scale(.97)}
   .src-btn:disabled{opacity:.35;cursor:not-allowed}
 
-  /* generic */
-  .section-title{font-size:11px;color:#9a9ab0;letter-spacing:3px;
-                 text-transform:uppercase;text-align:center;margin-bottom:-6px}
-  .panel{background:#1a1a2e;border-radius:14px;padding:14px 12px}
-  .hint{font-size:10px;color:#7d8299;line-height:1.5;margin-top:6px;text-align:center}
-  .row-wrap{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:8px}
-  .btn{padding:8px 14px;min-height:32px;border-radius:8px;background:#25253e;
-       border:1px solid transparent;color:#999;font-size:11px;font-weight:600;
-       cursor:pointer;transition:all .15s}
-  .btn.active{border-color:#7c8aff;color:#7c8aff}
-  .btn:active{transform:scale(.96)}
-  .btn:disabled{opacity:.35;cursor:not-allowed}
-  .btn.primary{background:#2a2a4e;color:#a8b0ff}
-  .btn.danger:hover{border-color:#c4646e;color:#c4646e}
+  
+  
+  .stages{counter-reset:stage;display:flex;flex-direction:column;gap:14px}
+  .stage{display:flex;flex-direction:column;gap:8px}
+  .section-title{font-size:10px;color:var(--fg-faint);letter-spacing:3px;
+                 text-transform:uppercase;margin:0;padding-left:3px}
+  .stage>.section-title::before{counter-increment:stage;
+                 content:counter(stage) '. ';color:var(--accent);font-weight:700}
+  
+  .sub-title{font-size:10px;color:var(--fg-faint);letter-spacing:3px;
+             text-transform:uppercase;margin-bottom:8px}
+  .panel{background:var(--panel);border:1px solid var(--line);
+         border-radius:var(--radius);padding:12px;box-shadow:var(--shadow);min-width:0}
+  .hint{font-size:10px;color:var(--fg-faint);line-height:1.5;margin-top:6px}
+  .row-wrap{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;
+       padding:8px 12px;min-height:32px;border-radius:var(--r-sm);
+       background:var(--panel2);border:1px solid transparent;color:var(--fg-dim);
+       font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;
+       text-decoration:none}
+  .btn:hover{border-color:var(--accent);color:var(--accent2)}
+  .btn.active{border-color:var(--accent);color:var(--accent2)}
+  .btn:active{transform:scale(.97)}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn.primary{background:var(--accent-bg);color:var(--accent2);border-color:var(--accent)}
+  .btn.danger:hover{border-color:var(--danger);color:var(--danger)}
   .btn.sm{padding:5px 9px;min-height:26px;font-size:10px}
+  
+  .fx-pick{background:var(--panel2);border:1px solid var(--line);border-radius:var(--r-xs);
+           color:var(--fg);font-size:11px;padding:6px 8px;min-height:30px;cursor:pointer}
+  .fx-pick option{background:var(--panel);color:var(--fg)}
 
   /* Notice bar: whatever the backend says is shown verbatim, never swallowed */
-  .notice{border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.5;
-          background:#3a2530;color:#f0a8b4;border:1px solid #5c3540}
-  .notice.warn{background:#3a3525;color:#e8cf9a;border-color:#5c5232}
-  .notice.ok{background:#223a2c;color:#9fd8b4;border-color:#2f5540}
+  .notice{border-radius:var(--r-sm);padding:10px 12px;font-size:12px;line-height:1.5;
+          background:var(--err-bg);color:var(--err-fg);border:1px solid var(--err-bd)}
+  .notice.warn{background:var(--warn-bg);color:var(--warn-fg);border-color:var(--warn-bd)}
+  .notice.ok{background:var(--ok-bg);color:var(--ok-fg);border-color:var(--ok-bd)}
   .notice .nt-h{font-weight:700;margin-bottom:3px}
   .notice ul{margin:4px 0 0 16px}
 
   /* sound type */
-  .type-list{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
-  .type-item{padding:8px 12px;min-height:34px;border-radius:9px;background:#25253e;
-             border:1px solid transparent;color:#c9c9dc;font-size:12px;font-weight:600;
-             cursor:pointer;display:flex;align-items:center;gap:5px}
-  .type-item.active{border-color:#7c8aff;color:#a8b0ff;background:#1a1a3e}
-  .type-item .mk{font-size:9px;color:#7d8299}
-  .type-item.active .mk{color:#8f95a8}
+  .type-list{display:flex;flex-wrap:wrap;gap:6px}
+  .type-item{padding:8px 12px;min-height:34px;border-radius:var(--r-sm);background:var(--panel2);
+             border:1px solid transparent;color:var(--fg);font-size:12px;font-weight:600;
+             cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .15s}
+  .type-item.active{border-color:var(--accent);color:var(--accent2);background:var(--accent-bg)}
+  .type-item .mk{font-size:9px;color:var(--fg-faint)}
+  .type-item.active .mk{color:var(--fg-dim)}
 
   /* Effects: this row is just labels/selectors; the values appear in the Settings panel below */
-  .fx-list{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
-  .fx-chip{padding:8px 12px;min-height:34px;border-radius:9px;background:#25253e;
-           border:1px solid transparent;color:#8f95a8;font-size:12px;font-weight:600;
-           cursor:pointer;display:flex;align-items:center;gap:6px}
-  .fx-chip.on{color:#dcdcf0}
-  .fx-chip.sel{border-color:#7c8aff;color:#a8b0ff;background:#1a1a3e}
+  .fx-list{display:flex;flex-wrap:wrap;gap:6px}
+  .fx-chip{padding:8px 12px;min-height:34px;border-radius:var(--r-sm);background:var(--panel2);
+           border:1px solid transparent;color:var(--fg-dim);font-size:12px;font-weight:600;
+           cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .15s}
+  .fx-chip.on{color:var(--fg)}
+  .fx-chip.sel{border-color:var(--accent);color:var(--accent2);background:var(--accent-bg)}
   .fx-chip.grey{opacity:.5;cursor:not-allowed}
-  .fx-chip .dot{width:7px;height:7px;border-radius:50%;background:#4a4a63;flex:0 0 auto}
-  .fx-chip.on .dot{background:#7c8aff}
-  .fx-tag{font-size:9px;padding:1px 5px;border-radius:6px;background:#25253e;color:#8f95a8;font-weight:600}
+  .fx-chip .dot{width:7px;height:7px;border-radius:50%;background:var(--fg-faint);flex:0 0 auto}
+  .fx-chip.on .dot{background:var(--accent)}
+  .fx-tag{font-size:9px;padding:1px 5px;border-radius:6px;background:var(--panel);
+          color:var(--fg-faint);font-weight:600}
   /* Settings panel (level 3): the settings themselves only; the name is already on the label above */
-  .set-desc{font-size:11px;color:#8f95a8;line-height:1.45;margin-bottom:4px}
-  .set-why{font-size:10px;color:#c9a06a;line-height:1.45;margin-bottom:4px}
-  .sw-state{font-size:11px;color:#8f95a8}
-  .set-body{margin-top:10px;padding-top:10px;border-top:1px solid #25253e;
+  .set-desc{font-size:11px;color:var(--fg-dim);line-height:1.45;margin-bottom:4px}
+  .set-why{font-size:10px;color:var(--warm);line-height:1.45;margin-bottom:4px}
+  .sw-state{font-size:11px;color:var(--fg-dim)}
+  .set-body{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);
             display:flex;flex-direction:column;gap:10px}
   /* The switch is a button, so it is easy to tap (and to test) */
-  .fx-sw{width:42px;height:24px;border-radius:12px;background:#25253e;border:none;
+  .fx-sw{width:42px;height:24px;border-radius:12px;background:var(--sw-off);border:none;
          position:relative;cursor:pointer;flex:0 0 auto;transition:background .15s}
   .fx-sw::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;
-                border-radius:50%;background:#8f95a8;transition:all .15s}
-  .fx-sw.on{background:#3d5a8a}
-  .fx-sw.on::after{left:21px;background:#fff}
+                border-radius:50%;background:var(--sw-knob);transition:all .15s}
+  .fx-sw.on{background:var(--sw-on)}
+  .fx-sw.on::after{left:21px;background:var(--knob)}
   .fx-sw:disabled{cursor:not-allowed}
-  .fx-x{background:transparent;border:none;color:#7d8299;font-size:12px;
+  .fx-x{background:transparent;border:none;color:var(--fg-faint);font-size:12px;
         cursor:pointer;padding:2px 4px;border-radius:6px}
-  .fx-x:hover{color:#c4646e;background:#25253e}
+  .fx-x:hover{color:var(--danger);background:var(--panel2)}
 
   /* One control row: label + slider + value */
   .ctl{display:flex;align-items:center;gap:8px}
-  .ctl .lb{font-size:10px;color:#8f95a8;min-width:40px}
+  .ctl .lb{font-size:10px;color:var(--fg-dim);min-width:40px}
   /* The slider ELEMENT must be 28px tall (that is the hit area); the thin track
      is drawn by the track pseudo-element. It used to be height:6px -- visually
      fine, but the hit area was only 6px, unusable on a phone (found by measuring, WCAG wants >=24px). */
   .ctl input[type=range]{flex:1;height:28px;background:transparent;
        -webkit-appearance:none;appearance:none;outline:none;min-width:0}
-  .ctl input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:#25253e}
+  .ctl input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:var(--track)}
   .ctl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;
-       width:20px;height:20px;border-radius:50%;background:#fff;margin-top:-7px;
-       border:2px solid #7c8aff;box-shadow:0 2px 6px rgba(0,0,0,.3)}
-  .ctl input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:#25253e}
-  .ctl input[type=range]::-moz-range-progress{height:6px;border-radius:3px;background:#7c8aff}
+       width:20px;height:20px;border-radius:50%;background:var(--knob);margin-top:-7px;
+       border:2px solid var(--accent);box-shadow:0 2px 6px rgba(0,0,0,.3)}
+  .ctl input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:var(--track)}
+  .ctl input[type=range]::-moz-range-progress{height:6px;border-radius:3px;background:var(--accent)}
   .ctl input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;
-       background:#fff;border:2px solid #7c8aff}
-  .ctl .val{font-size:10px;color:#a8b0ff;min-width:56px;text-align:right;
+       background:var(--knob);border:2px solid var(--accent)}
+  .ctl .val{font-size:10px;color:var(--accent2);min-width:56px;text-align:right;
             font-variant-numeric:tabular-nums}
-  .grid-head{display:flex;gap:8px;align-items:center;font-size:10px;color:#8f95a8;
+  .grid-head{display:flex;gap:8px;align-items:center;font-size:10px;color:var(--fg-dim);
     padding:2px 0 0}
   .grid-head .lb{min-width:46px}
   .grid-head .lb:nth-child(2){flex:1;min-width:0}
@@ -132,131 +224,173 @@
   .ctl[data-grid] input[type=range]{flex:1;min-width:0}
   .ctl[data-grid] .val{min-width:48px;text-align:right}
   .strength{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-  .strength .lb{font-size:10px;color:#8f95a8;margin-right:2px}
+  .strength .lb{font-size:10px;color:var(--fg-dim);margin-right:2px}
 
-  /* genre presets (secondary, collapsed by default) */
-  details.presets>summary{cursor:pointer;font-size:11px;color:#9a9ab0;
-        letter-spacing:3px;text-transform:uppercase;text-align:center;list-style:none}
-  details.presets>summary::-webkit-details-marker{display:none}
-  .pst-list{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:10px}
-  .pst-item{display:flex;align-items:center;gap:6px;background:#25253e;border-radius:9px;
+  
+  .pst-list{display:flex;flex-wrap:wrap;gap:6px;max-height:36vh;overflow:auto}
+  .pst-item{display:flex;align-items:center;gap:6px;background:var(--panel2);border-radius:var(--r-sm);
             padding:7px 9px;border:1px solid transparent}
-  .pst-item.active{border-color:#7c8aff}
+  .pst-item.active{border-color:var(--accent)}
   .pst-item.grey{opacity:.5}
-  .pst-item .nm{font-size:11px;font-weight:600;color:#c9c9dc;cursor:pointer;
-                max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .pst-item.active .nm{color:#a8b0ff}
-  .pst-item .mini{font-size:9px;color:#7d8299}
+  .pst-item .nm{font-size:11px;font-weight:600;color:var(--fg);cursor:pointer;flex:1;min-width:0;
+                overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pst-item.active .nm{color:var(--accent2)}
+  .pst-item .mini{font-size:9px;color:var(--fg-faint)}
 
   /* volume / status / reboot */
-  .vol-row{display:flex;align-items:center;gap:10px;padding:4px 8px}
-  .vol-row .icon{font-size:22px}
+  .vol-panel{padding:4px 12px}
+  .vol-row{display:flex;align-items:center;gap:10px}
+  .vol-row .icon{font-size:18px;opacity:.85}
   /* Same for the volume slider: tall hit area, thin track */
-  .vol-row input[type=range]{flex:1;height:28px;background:transparent;
+  .vol-row input[type=range]{flex:1;min-width:0;height:28px;background:transparent;
        -webkit-appearance:none;appearance:none;outline:none}
-  .vol-row input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:#25253e}
+  .vol-row input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:var(--track)}
   .vol-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;
-       width:24px;height:24px;border-radius:50%;background:#fff;border:2px solid #7c8aff;margin-top:-9px}
-  .vol-row input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:#25253e}
-  .vol-row input[type=range]::-moz-range-progress{height:6px;border-radius:3px;background:#7c8aff}
+       width:24px;height:24px;border-radius:50%;background:var(--knob);border:2px solid var(--accent);margin-top:-9px}
+  .vol-row input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:var(--track)}
+  .vol-row input[type=range]::-moz-range-progress{height:6px;border-radius:3px;background:var(--accent)}
   .vol-row input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;
-       background:#fff;border:2px solid #7c8aff}
-  .vol-row .pct{font-size:14px;font-weight:600;color:#7c8aff;min-width:36px;text-align:right}
-  .vol-row .db{font-size:11px;color:#8b8ba7;min-width:44px;text-align:right}
-  .status-bar{display:flex;justify-content:center;gap:16px;font-size:10px;color:#8f95a8;padding:4px 0}
-  .sys-row{display:flex;align-items:center;justify-content:center;gap:10px;
-           font-size:10px;color:#8f95a8;padding:6px 0 0}
-  .sys-btn{padding:5px 12px;border-radius:7px;background:transparent;border:1px solid #3a3a55;
-           color:#8f95a8;font-size:11px;cursor:pointer}
-  .sys-btn:hover{border-color:#c4646e;color:#c4646e}
+       background:var(--knob);border:2px solid var(--accent)}
+  .vol-row .pct{font-size:14px;font-weight:700;color:var(--accent);min-width:38px;text-align:right}
+  .vol-row .db{font-size:11px;color:var(--fg-faint);min-width:46px;text-align:right}
+  .status-bar{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;
+              font-size:10px;color:var(--fg-dim);padding:0 0 6px}
+  .sys-row{display:flex;align-items:center;gap:10px;font-size:10px;color:var(--fg-faint);
+           padding-top:8px;border-top:1px solid var(--line)}
+  .sys-btn{padding:5px 12px;min-height:28px;border-radius:var(--r-xs);background:transparent;
+           border:1px solid var(--line);color:var(--fg-dim);font-size:11px;cursor:pointer}
+  .sys-btn:hover{border-color:var(--danger);color:var(--danger)}
   .sys-btn:disabled{opacity:.5;cursor:default}
+
+  
+  @media (max-width:700px){
+    .player{grid-template-columns:1fr}
+    .engine-line{text-align:left}
+    .pst-list{max-height:none}
+  }
+  @media (max-width:420px){
+    body{padding:8px}
+    .panel{padding:10px 8px}
+    .app{gap:10px}
+  }
 </style>
 </head>
 <body>
 
 <div class="app">
 
-  <div class="header">ZYBO Audio <span id="app-ver"></span></div>
-  <div class="engine-line" id="engine-line"></div>
-
-  <!-- Now Playing -->
-  <div class="card" id="now-playing">
-    <div class="art" id="art">🎵</div>
-    <div class="title" id="np-title">Not playing</div>
-    <div class="artist" id="np-artist">No source selected</div>
-    <div><span class="source-badge" id="source-badge">Idle</span></div>
-  </div>
-
-  <!-- Source -->
-  <div class="source-row" id="source-row">
-    <button class="src-btn active" data-src="idle"      id="src-idle">🛑 Stop</button>
-    <button class="src-btn"        data-src="airplay"   id="src-airplay">📱 AirPlay</button>
-    <button class="src-btn"        data-src="dlna"      id="src-dlna">🏠 DLNA</button>
-    <button class="src-btn"        data-src="bluetooth" id="src-bt">🎧 Bluetooth</button>
-  </div>
-
-  <div class="notice" id="notice" hidden></div>
-
-  <!-- Sound type -->
-  <div class="section-title">Sound type</div>
-  <div class="panel">
-    <div class="type-list" id="type-list"></div>
-    <div class="row-wrap" id="type-actions"></div>
-    <div class="hint" id="type-hint"></div>
-  </div>
-
-  <!-- Effects (level 2): this type's own effects -- just a row of labels; tap one to select -->
-  <div class="section-title">Effects</div>
-  <div class="panel">
-    <div class="fx-list" id="fx-list"></div>
-    <div class="row-wrap" id="fx-actions"></div>
-    <div class="hint" id="fx-hint"></div>
-  </div>
+  
+  <header class="topbar">
+    <div class="brand">ZYBO Audio <span id="app-ver"></span></div>
+    <div class="engine-line" id="engine-line"></div>
+    <label class="theme-box" title="Theme">
+      <select id="theme-pick">
+        <option value="dark">Dark</option>
+        <option value="light">Light</option>
+        <option value="contrast">High contrast</option>
+        <option value="warm">Warm</option>
+      </select>
+    </label>
+  </header>
 
   
-  <div class="section-title">Settings</div>
-  <div class="panel" id="fx-settings"></div>
-
-  <!-- Overall: items that belong to no single effect (peak limiter, headroom), always shown -->
-  <div class="section-title">Overall</div>
-  <div class="panel" id="global-settings"></div>
-
-  <!-- Genre presets (secondary) -->
-  
-  <details class="presets" open>
-    <summary>Genre presets</summary>
-    <div class="panel" style="margin-top:10px">
-      <div class="pst-list" id="preset-list"></div>
-      <div class="row-wrap">
-        <button class="btn" id="btn-save-preset">💾 Save preset</button>
-        <button class="btn" id="btn-import" title="Import a custom JSON preset, REW text or AutoEQ text">📥 Import</button>
-        <a class="btn" id="btn-export-rew" href="/api/dsp/export?format=rew" download
-           style="text-decoration:none;display:inline-flex;align-items:center">📤 Export EQ (REW)</a>
-        <input type="file" id="file-import" accept=".txt,.json" style="display:none">
+  <section class="player">
+    <div class="card np" id="now-playing">
+      <div class="art" id="art">🎵</div>
+      <div class="np-body">
+        <div class="title" id="np-title">Not playing</div>
+        <div class="artist" id="np-artist">No source selected</div>
+        <div><span class="source-badge" id="source-badge">Idle</span></div>
       </div>
-      <div class="hint" id="preset-hint"></div>
     </div>
-  </details>
 
-  <!-- Volume -->
-  <div class="section-title">Volume</div>
-  <div class="vol-row">
-    <span class="icon">🔈</span>
-    <input type="range" id="vol-slider" min="-60" max="0" value="-12" step="1">
-    <span class="icon">🔊</span>
-    <span class="pct" id="vol-pct">80%</span>
-    <span class="db" id="vol-db">--</span>
+    <div class="player-side">
+      <div class="source-row" id="source-row">
+        <button class="src-btn active" data-src="idle"      id="src-idle">🛑 Stop</button>
+        <button class="src-btn"        data-src="airplay"   id="src-airplay">📱 AirPlay</button>
+        <button class="src-btn"        data-src="dlna"      id="src-dlna">🏠 DLNA</button>
+        <button class="src-btn"        data-src="bluetooth" id="src-bt">🎧 Bluetooth</button>
+      </div>
+
+      <div class="panel vol-panel">
+        <div class="vol-row">
+          <span class="icon">🔈</span>
+          <input type="range" id="vol-slider" min="-60" max="0" value="-12" step="1">
+          <span class="icon">🔊</span>
+          <span class="pct" id="vol-pct">80%</span>
+          <span class="db" id="vol-db">--</span>
+        </div>
+      </div>
+
+      <div class="notice" id="notice" hidden></div>
+    </div>
+  </section>
+
+  
+  <div class="stages">
+
+    
+    <div class="stage">
+      <div class="section-title">Sound type</div>
+      <div class="panel">
+        <div class="type-list" id="type-list"></div>
+        <div class="row-wrap" id="type-actions"></div>
+        <div class="hint" id="type-hint"></div>
+      </div>
+    </div>
+
+    
+    <div class="stage">
+      <div class="section-title">Effect cards</div>
+      <div class="panel">
+        <div class="fx-list" id="fx-list"></div>
+        <div class="row-wrap" id="fx-actions"></div>
+        <div class="hint" id="fx-hint"></div>
+      </div>
+    </div>
+
+    
+    <div class="stage">
+      <div class="section-title">Settings</div>
+      <div class="panel">
+        <div id="fx-settings"></div>
+        <div class="row-wrap" id="fx-save"></div>
+      </div>
+
+      
+      <div class="panel">
+        <div class="sub-title">Chain level</div>
+        <div id="global-settings"></div>
+      </div>
+    </div>
+
   </div>
 
-  <div class="status-bar" id="status-bar">
-    <span>CPU <span id="sys-cpu">--</span>%</span>
-    <span>RAM <span id="sys-ram">--</span>MB</span>
-    <span>Uptime <span id="sys-uptime">--</span></span>
+  
+  <div class="section-title">Genre presets</div>
+  <div class="panel">
+    <div class="pst-list" id="preset-list"></div>
+    <div class="row-wrap">
+      <button class="btn" id="btn-save-preset">💾 Save preset</button>
+      <button class="btn" id="btn-import" title="Import a custom JSON preset, REW text or AutoEQ text">📥 Import</button>
+      <a class="btn" id="btn-export-rew" href="/api/dsp/export?format=rew" download>📤 Export EQ (REW)</a>
+      <input type="file" id="file-import" accept=".txt,.json" style="display:none">
+    </div>
+    <div class="hint" id="preset-hint"></div>
   </div>
 
-  <div class="sys-row">
-    <button class="sys-btn" id="btn-reboot">Reboot</button>
-    <span id="sys-note"></span>
+  
+  <div class="section-title">Device</div>
+  <div class="panel">
+    <div class="status-bar" id="status-bar">
+      <span>CPU <span id="sys-cpu">--</span>%</span>
+      <span>RAM <span id="sys-ram">--</span>MB</span>
+      <span>Uptime <span id="sys-uptime">--</span></span>
+    </div>
+    <div class="sys-row">
+      <button class="sys-btn" id="btn-reboot">Reboot</button>
+      <span id="sys-note"></span>
+    </div>
   </div>
 
 </div>
@@ -362,6 +496,20 @@ function el(tag, cls, text){
   return e;
 }
 function effectDef(id){ return EFFECTS.find(function(e){ return e.id === id }) }
+function fxKind(fx){ return (fx && fx.kind) || ((effectDef(fx && fx.id) || {}).kind) || '' }
+function fxName(fx){
+  const d = effectDef(fx && fx.id);
+  return (fx && fx.name) || (d && d.name) || ((fx && fx.id) || '');
+}
+function fxDesc(fx){ const d = effectDef(fx && fx.id); return (fx && fx.desc) || (d && d.desc) || '' }
+function fxRequires(fx){ const d = effectDef(fx && fx.id); return !!(d && d.requires) }
+function stampFx(fx){
+  const d = effectDef(fx.id);
+  if(!fx.kind) fx.kind = fxKind(fx);
+  if(!fx.name && d) fx.name = d.name;
+  if(!fx.desc && d && d.desc) fx.desc = d.desc;
+  return fx;
+}
 function gridBands(def, mode){
   const base = STRENGTH_DB[mode] || STRENGTH_DB.mid;
   const w = (def && def.w) ? def.w : GRID.map(function(){ return 0 });
@@ -388,15 +536,14 @@ function normalizeBands(bands, def, mode){
   return out;
 }
 function normalizeFx(fx){
-  const def = effectDef(fx.id);
-  if(def && def.kind === 'bands') fx.bands = normalizeBands(fx.bands, def, fx.mode);
+  stampFx(fx);
+  if(fxKind(fx) === 'bands') fx.bands = normalizeBands(fx.bands, effectDef(fx.id), fx.mode);
   return fx;
 }
-function isBandFx(fx){ const d = effectDef(fx.id); return !!(d && (d.kind === 'bands' || d.requires)) }
+function isBandFx(fx){ return fxKind(fx) === 'bands' || fxRequires(fx) }
 function isSelectableFx(fx){
-  const d = effectDef(fx.id);
-  return !!(d && (d.kind === 'bands' || d.kind === 'cross' ||
-                  d.kind === 'delay' || d.requires));
+  const k = fxKind(fx);
+  return !!(k === 'bands' || k === 'cross' || k === 'delay' || fxRequires(fx));
 }
 function chipEffects(){ return curEffects.filter(isSelectableFx) }
 function limiterFx(){
@@ -411,7 +558,7 @@ function mergedChain(){
   const acc = GRID.map(function(f, i){ return { freq:f, q:GRID_Q[i], gain_db:0, w:0 } });
   curEffects.forEach(function(fx){
     if(!fx.enabled || !isBandFx(fx)) return;
-    if(effectDef(fx.id).requires) return;
+    if(fxRequires(fx)) return;
     (fx.bands || []).forEach(function(b){
       let i = GRID.indexOf(+b.freq);
       if(i < 0) return;
@@ -513,7 +660,8 @@ let BUILTIN_NAMES = [];
 // Deep-copy effects into a working copy (never mutate the objects inside `types`)
 function cloneEffects(list){
   return (list || []).map(function(e){
-    const fx = { id:e.id, enabled:!!e.enabled, mode:e.mode || '',
+    const fx = { id:e.id, name:e.name || '', kind:e.kind || '', desc:e.desc || '',
+                 enabled:!!e.enabled, mode:e.mode || '',
                  params: Object.assign({}, e.params || {}),
                  bands: (e.bands || []).map(function(b){
                    return { type:b.type || 'peq', enabled:true,
@@ -606,6 +754,7 @@ async function newType(){
   }
   types.push({ name:name.trim(), note:'', builtin:false, effects: cloneEffects(curEffects) });
   curName = name.trim();
+  dirty = true;
   renderTypes(); renderFx(); await applyNow();
   showNotice('Created type "' + curName + '" (copied from the current one)', 'ok');
 }
@@ -619,6 +768,7 @@ async function copyType(){
   }
   types.push({ name:name.trim(), note:'', builtin:false, effects: cloneEffects(curEffects) });
   curName = name.trim();
+  dirty = true;
   renderTypes(); renderFx(); await applyNow();
   showNotice('Copied to "' + curName + '"', 'ok');
 }
@@ -676,21 +826,21 @@ function renderChips(){
   if(!box) return;
   box.innerHTML = '';
   chipEffects().forEach(function(fx){
-    const def = effectDef(fx.id);
-    const grey = !!(def && def.requires);
+    const grey = fxRequires(fx);
     const cls = 'fx-chip' + (fx.enabled && !grey ? ' on' : '') +
                 (grey ? ' grey' : '') + (fx.id === selectedFx ? ' sel' : '');
     const chip = el('div', cls);
     chip.dataset.fx = fx.id;
     chip.appendChild(el('span','dot'));
-    chip.appendChild(document.createTextNode(def ? def.name : fx.id));
+    chip.appendChild(document.createTextNode(fxName(fx)));
     if(grey) chip.appendChild(el('span','fx-tag','P2'));
     if(grey){
-      chip.title = plannedReason(def.requires) || 'Not supported by this engine yet';
+      const req = (effectDef(fx.id) || {}).requires;
+      chip.title = plannedReason(req) || 'Not supported by this engine yet';
       chip.addEventListener('click', function(){
         selectedFx = fx.id; renderFx();
-        showNotice('Effect ' + (def.name) + ' is not usable yet', 'warn',
-          [plannedReason(def.requires) || 'needs a newer engine']);
+        showNotice('"' + fxName(fx) + '" cannot be used right now', 'warn',
+          [plannedReason(req) || 'needs a stronger engine']);
       });
     } else {
       chip.addEventListener('click', function(){ selectedFx = fx.id; renderFx() });
@@ -714,30 +864,34 @@ function renderSettings(){
   selectedFx = fx.id;
 
   const def = effectDef(fx.id);
-  const grey = !!(def && def.requires);
-  if(!fx.bands || !fx.bands.length) fx.bands = gridBands(def, fx.mode || 'mid');
-  fx.bands = normalizeBands(fx.bands, def, fx.mode);
+  const kind = fxKind(fx);
+  const grey = fxRequires(fx);
+  if(kind === 'bands'){
+    if(!fx.bands || !fx.bands.length) fx.bands = gridBands(def, fx.mode || 'mid');
+    fx.bands = normalizeBands(fx.bands, def, fx.mode);
+  }
 
   // The settings panel does NOT repeat the effect name (the label above shows it);
-  if(def && def.desc) box.appendChild(el('div','set-desc', def.desc));
-  if(grey) box.appendChild(el('div','set-why', plannedReason(def.requires) || 'Not supported by this engine yet'));
+  if(fxDesc(fx)) box.appendChild(el('div','set-desc', fxDesc(fx)));
+  if(grey) box.appendChild(el('div','set-why', plannedReason((def || {}).requires) || 'Not supported by this engine yet'));
 
   const swRow = el('div','ctl');
   swRow.appendChild(el('span','lb','On/off'));
   const sw = el('button','fx-sw' + (fx.enabled && !grey ? ' on' : ''));
-  sw.setAttribute('aria-label', (def ? def.name : fx.id) + ' switch');
+  sw.setAttribute('aria-label', fxName(fx) + ' on/off');
   if(grey) sw.disabled = true;
   sw.addEventListener('click', function(){
     if(grey) return;
     fx.enabled = !fx.enabled;
-    if(fx.enabled && (!fx.bands || !fx.bands.length)) fx.bands = gridBands(def, fx.mode || 'mid');
+    if(kind === 'bands' && fx.enabled && (!fx.bands || !fx.bands.length))
+      fx.bands = gridBands(def, fx.mode || 'mid');
     dirty = true; syncCurType(); renderFx(); applyCurrent();
   });
   swRow.appendChild(sw);
   swRow.appendChild(el('span','sw-state', fx.enabled ? 'on' : 'off'));
   box.appendChild(swRow);
 
-  if(def && def.kind === 'cross'){
+  if(kind === 'cross'){
     if(!fx.params) fx.params = {};
     if(typeof fx.params.fcut_hz !== 'number') fx.params.fcut_hz = 700;
     if(typeof fx.params.feed !== 'number') fx.params.feed = 60;
@@ -781,7 +935,7 @@ function renderSettings(){
     return;
   }
 
-  if(def && def.kind === 'delay'){
+  if(kind === 'delay'){
     if(!fx.params) fx.params = {};
     if(typeof fx.params.delay_ms !== 'number') fx.params.delay_ms = 2.5;
     const row = el('div','ctl');
@@ -894,7 +1048,55 @@ function renderFx(){
   renderChips();
   renderSettings();
   renderFxActions();
+  renderSaveRow();
   renderGlobal();
+}
+
+function renderSaveRow(){
+  const box = $('fx-save');
+  if(!box) return;
+  box.innerHTML = '';
+
+  const cur = curEffects.find(function(e){ return e.id === selectedFx }) || chipEffects()[0];
+  const b1 = el('button','btn sm primary','+ Save as new effect');
+  b1.id = 'fx-save-new';
+  if(!cur) b1.disabled = true;
+  b1.addEventListener('click', function(){ saveAsNewFx(cur) });
+  box.appendChild(b1);
+
+  const b2 = el('button','btn sm','+ Save as new type');
+  b2.id = 'fx-save-newtype';
+  b2.addEventListener('click', saveAsNewType);
+  box.appendChild(b2);
+}
+
+async function saveAsNewFx(cur){
+  if(!cur) return;
+  const name = (window.prompt && window.prompt('Name for the new effect?', (fxName(cur) || 'My effect') + ' copy')) || '';
+  if(!name.trim()) return;
+  const fx = cloneEffects([cur])[0];
+  fx.id = 'u_' + Date.now().toString(36);
+  fx.name = name.trim();
+  fx.kind = fxKind(cur);
+  fx.desc = fxDesc(cur);
+  curEffects.push(fx);
+  selectedFx = fx.id;
+  dirty = true; syncCurType(); renderFx(); await applyNow();
+  showNotice('Saved as new effect "' + fx.name + '" (inside the current type "' + curName + '")', 'ok');
+}
+
+async function saveAsNewType(){
+  const name = (window.prompt && window.prompt('Name for the new type?', curName + ' copy')) || '';
+  if(!name.trim()) return;
+  if(types.some(function(t){ return t.name === name.trim() })){
+    showNotice('A type with that name already exists', 'warn', ['Pick another name, or select it in block 1 and rename it.']);
+    return;
+  }
+  types.push({ name:name.trim(), note:'', builtin:false, effects: cloneEffects(curEffects) });
+  curName = name.trim();
+  dirty = true;
+  renderTypes(); renderFx(); await applyNow();
+  showNotice('Saved as new type "' + curName + '"', 'ok');
 }
 
 function renderGlobal(){
@@ -1041,8 +1243,7 @@ function renderFxActions(){
   if(available.length){
     const pick = document.createElement('select');
     pick.id = 'fx-pick';
-    pick.style.cssText = 'background:#25253e;border:1px solid #2f2f48;border-radius:8px;'+
-                         'color:#dcdcf0;font-size:11px;padding:6px 8px';
+    pick.className = 'fx-pick';
     available.forEach(function(def){
       const o = document.createElement('option');
       o.value = def.id;
@@ -1299,6 +1500,27 @@ $('file-import').addEventListener('change', function(){
   if(!f) return;
   importFile(f); this.value = '';
 });
+
+// ── Theme ────────────────────────────────────────────────────────────────
+(function(){
+  const SEL = $('theme-pick');
+  const NAMES = ['dark', 'light', 'contrast', 'warm'];
+  const META = { dark:'#1a1a2e', light:'#ffffff', contrast:'#000000', warm:'#221a14' };
+  function applyTheme(t){
+    if(NAMES.indexOf(t) < 0) t = 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+    const m = document.querySelector('meta[name=theme-color]');
+    if(m) m.setAttribute('content', META[t] || '#1a1a2e');
+    if(SEL) SEL.value = t;
+  }
+  let saved = 'dark';
+  try { saved = localStorage.getItem('zybo_theme') || 'dark' } catch(e){}
+  applyTheme(saved);
+  if(SEL) SEL.addEventListener('change', function(){
+    applyTheme(SEL.value);
+    try { localStorage.setItem('zybo_theme', SEL.value) } catch(e){}
+  });
+})();
 
 $('btn-reboot').addEventListener('click', function(){
   if(!(window.confirm && window.confirm('Reboot ZYBO Audio?\n\nPlayback stops immediately and this page returns automatically.'))) return;
