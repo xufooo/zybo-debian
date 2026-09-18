@@ -300,7 +300,7 @@ const EFFECTS = [
     w:[0.5, 0.42, 0.15, 0, -0.2, -0.3, -0.4] },
   // Planned: the reason comes from capabilities.planned and is shown as-is
   { id:'spatial', name:'3D / headphone stage', desc:'Moves headphone sound off the top of your head',
-    stage:'P2', requires:['crossfeed'] },
+    stage:'P2', kind:'cross' },
   { id:'widener', name:'Stereo widening',   desc:'Wider, more enveloping image',
     stage:'P2', requires:['widener'] },
 ];
@@ -324,6 +324,7 @@ const sliderFromQ    = q => SLIDER_STEPS * Math.log(q / Q_MIN) / Math.log(Q_MAX 
 let state = {};          // /api/status
 let caps = null;         // /api/dsp/capabilities
 let dynAvail = false;
+let crossAvail = false;
 let types = [];          // /api/dsp/types
 let curName = '';        // currently selected type
 let curEffects = [];     // this type's effects (working copy)
@@ -391,7 +392,11 @@ function normalizeFx(fx){
   return fx;
 }
 function isBandFx(fx){ const d = effectDef(fx.id); return !!(d && (d.kind === 'bands' || d.requires)) }
-function chipEffects(){ return curEffects.filter(isBandFx) }
+function isSelectableFx(fx){
+  const d = effectDef(fx.id);
+  return !!(d && (d.kind === 'bands' || d.kind === 'cross' || d.requires));
+}
+function chipEffects(){ return curEffects.filter(isSelectableFx) }
 function limiterFx(){
   let fx = curEffects.find(function(e){ return e.id === 'limiter' });
   if(!fx){
@@ -480,6 +485,7 @@ async function loadCaps(){
   try { caps = await api('/api/dsp/capabilities') }
   catch(e){ caps = null; showNotice('Cannot read engine capabilities: ' + e.message) }
   dynAvail = !!(caps && caps.dyn_bass && caps.dyn_bass.available);
+  crossAvail = !!(caps && caps.crossfeed && caps.crossfeed.available);
   if(!dynAvail) dynBass.on = false;
   renderEngineLine();
 }
@@ -727,6 +733,50 @@ function renderSettings(){
   swRow.appendChild(sw);
   swRow.appendChild(el('span','sw-state', fx.enabled ? 'on' : 'off'));
   box.appendChild(swRow);
+
+  if(def && def.kind === 'cross'){
+    if(!fx.params) fx.params = {};
+    if(typeof fx.params.fcut_hz !== 'number') fx.params.fcut_hz = 700;
+    if(typeof fx.params.feed !== 'number') fx.params.feed = 60;
+    const grey2 = !crossAvail;
+    const mk = function(label, key, min, max, step, unit, fmt){
+      const row = el('div','ctl');
+      row.appendChild(el('span','lb', label));
+      const inp = document.createElement('input');
+      inp.type = 'range'; inp.min = min; inp.max = max; inp.step = step;
+      inp.value = String(fx.params[key]);
+      inp.id = 'cross-' + key;
+      inp.setAttribute('aria-label', label);
+      if(grey2) inp.disabled = true;
+      const val = el('span','val', fmt(fx.params[key]));
+      inp.addEventListener('input', function(){
+        fx.params[key] = +inp.value;
+        val.textContent = fmt(fx.params[key]);
+        dirty = true; syncCurType(); applyCurrent();
+      });
+      row.appendChild(inp); row.appendChild(val);
+      box.appendChild(row);
+      return inp;
+    };
+    mk('Low-pass cut', 'fcut_hz', 300, 2000, 10, ' Hz', function(v){ return v.toFixed(0) + ' Hz' });
+    mk('Crossfeed amount', 'feed', 10, 150, 5, '', function(v){ return (v/10).toFixed(1) + ' dB' });
+    box.appendChild(el('div','hint', !crossAvail
+      ? 'This bitstream has no MIX2 (the hardware requirement for crossfeed): see the engine line above.'
+      : 'A copy of the bs2b headphone crossfeed: this side quietly gets some of the other channel low end, so the sound is less stuck inside your head.'
+        + 'A lower cut sends less low end across; a larger amount sends it more faintly (6 dB is the bs2b Light setting).'
+        + 'Mono content keeps the same level through it.'));
+    if(!fx.enabled) box.appendChild(el('div','hint','Currently off: the values above are stored in this type and take effect once it is on.'));
+    const rm = el('button','btn sm danger','✕ Remove this effect from the type');
+    rm.id = 'fx-remove';
+    rm.addEventListener('click', function(){
+      const i = curEffects.findIndex(function(e){ return e.id === fx.id });
+      if(i >= 0) curEffects.splice(i,1);
+      selectedFx = '';
+      dirty = true; syncCurType(); renderFx(); applyCurrent();
+    });
+    box.appendChild(rm);
+    return;
+  }
 
   const st = el('div','strength');
   st.appendChild(el('span','lb','Strength'));
@@ -1006,8 +1056,14 @@ async function applyNow(){
       'err', ['Turn a card off or enable fewer sections; nothing is dropped for you silently.']);
   } else {
     try {
-      const body = { chain: items };
+      const body = { chain: items, type: curName };
       if(dynAvail) body.dyn_bass = (dynBass.on ? { gain_db: dynBass.gain } : { off: true });
+      const cfx = curEffects.find(function(e){ return e.id === 'spatial' });
+      const cp = (cfx && cfx.params) || {};
+      if(crossAvail && cfx) body.crossfeed = cfx.enabled
+        ? { fcut_hz: (typeof cp.fcut_hz === 'number' ? cp.fcut_hz : 700),
+            feed:    (typeof cp.feed === 'number' ? cp.feed : 60) }
+        : { off: true };
       const d = await postJSON('/api/dsp/chain', body, 'PUT');
       if(d && typeof d.preamp_db === 'number'){
         appliedPreamp = d.preamp_db;
@@ -1228,15 +1284,30 @@ $('btn-reboot').addEventListener('click', function(){
     const st = await api('/api/status');
     if(st && st.dsp && typeof st.dsp.preamp_db === 'number') appliedPreamp = st.dsp.preamp_db;
   } catch(e){}
+  let savedType = '';
+  let cfSaved = null;
   try {
     const ch = await api('/api/dsp/chain');
     const db = ch && ch.dyn_bass;
     if(db) dynBass = { on: true, gain: Math.max(0, Math.min(12, +db.gain_db || 6)) };
     else if(ch) dynBass = { on: false, gain: dynBass.gain };
+    if(ch && typeof ch.type === 'string') savedType = ch.type;
+    cfSaved = (ch && ch.crossfeed) || null;
   } catch(e){}
   await Promise.all([loadTypes(), loadPresets()]);
-  curName = types.length ? types[0].name : '';
+  curName = (savedType && types.some(function(t){ return t.name === savedType }))
+    ? savedType
+    : (types.length ? types[0].name : '');
   curEffects = cloneEffects(curType() ? curType().effects : []);
+  if(cfSaved){
+    const cfx = curEffects.find(function(e){ return e.id === 'spatial' });
+    if(cfx){
+      if(!cfx.params) cfx.params = {};
+      if(typeof cfSaved.fcut_hz === 'number') cfx.params.fcut_hz = cfSaved.fcut_hz;
+      if(typeof cfSaved.feed === 'number') cfx.params.feed = cfSaved.feed;
+      cfx.enabled = true;
+    }
+  }
   renderTypes(); renderFx();
   fetchStatus(); connectWS();
 })();
