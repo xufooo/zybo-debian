@@ -990,21 +990,25 @@ function renderSettings(){
     return;
   }
 
-  const st = el('div','strength');
-  st.appendChild(el('span','lb','Strength'));
-  ['light','mid','strong'].forEach(function(k){
-    const b = el('button','btn sm' + (fx.mode === k ? ' active' : ''), STRENGTH_LABEL[k]);
-    b.dataset.strength = k;
-    if(grey) b.disabled = true;
-    b.addEventListener('click', function(){
-      if(grey) return;
-      fx.mode = k;
-      fx.bands = gridBands(def, k);
-      dirty = true; syncCurType(); renderFx(); applyCurrent();
+  if(def && def.w){
+    const st = el('div','strength');
+    st.appendChild(el('span','lb','Strength'));
+    ['light','mid','strong'].forEach(function(k){
+      const b = el('button','btn sm' + (fx.mode === k ? ' active' : ''), STRENGTH_LABEL[k]);
+      b.dataset.strength = k;
+      if(grey) b.disabled = true;
+      b.addEventListener('click', function(){
+        if(grey) return;
+        fx.mode = k;
+        fx.bands = gridBands(def, k);
+        dirty = true; syncCurType(); renderFx(); applyCurrent();
+      });
+      st.appendChild(b);
     });
-    st.appendChild(b);
-  });
-  box.appendChild(st);
+    box.appendChild(st);
+  } else {
+    box.appendChild(el('div','hint','This curve is one you saved (or imported): adjust each row below; there is no strength preset.'));
+  }
 
   const g = el('div','grid-head');
   g.appendChild(el('span','lb','Band'));
