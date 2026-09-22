@@ -1,8 +1,7 @@
-// SPDX-License-Identifier: GPL-2.0-only
 // ws.go — WebSocket real-time push
 //
-// Architecture: one hub (center) + multiple client goroutines
-// When the backend state changes → hub.broadcast → every connected Web UI refreshes live
+// Architecture: hub (the center) + several client goroutines
+// When backend state changes → hub.broadcast → every connected Web UI refreshes live
 
 package main
 
@@ -41,7 +40,7 @@ func newWSHub() *wsHub {
 }
 
 func (h *wsHub) run() {
-	// The hub stays alive; it does not need to do anything on its own
+	// the hub stays alive; it has nothing to do on its own
 	select {}
 }
 
@@ -69,7 +68,7 @@ func (h *wsHub) broadcast(msg []byte) {
 		select {
 		case c.send <- msg:
 		default:
-			// client channel full → drop (to avoid blocking)
+			// client channel full → drop (avoids blocking)
 		}
 	}
 }
@@ -89,7 +88,7 @@ func serveWS(hub *wsHub, w http.ResponseWriter, r *http.Request) {
 	}
 	hub.add(client)
 
-	// Writer goroutine: push from the send channel to the client
+	// writer goroutine: push messages from the send channel to the client
 	go func() {
 		defer conn.Close()
 		for msg := range client.send {
@@ -100,7 +99,7 @@ func serveWS(hub *wsHub, w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	// Reader goroutine: receive client messages (we don't need them for now, but it keeps the connection alive)
+	// reader goroutine: receive client messages (not needed right now, but keeps the connection alive)
 	go func() {
 		defer hub.remove(client)
 		for {

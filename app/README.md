@@ -7,9 +7,13 @@ it into the Debian image; none of the files here are build products.
 ## Layout
 
 ```
-backend/                 Go sources (package main)
-  api.go config.go dsp.go main.go source.go status.go ws.go
-  dsp_design_test.go     offline DSP design tests
+backend/                 Go sources (package main): the 0.2 slot-table engine,
+                         effects, chain compiler, DDC/IR handling and HTTP API
+  dsp_slot.go            slot-table engine: chain planner and register writes
+  chain.go state.go      chain assembly, persistence and the effect registry
+  api*.go                HTTP endpoints (chain, EQ, IR, DDC, types, limits)
+  viperbass/dynbass/...  per-effect models and coefficient builders
+  *_test.go              offline design tests (no board required)
 go.mod  go.sum           Go module (module zybo-audio-web, gorilla/websocket)
 webui/                   WebUI source (single-page index.html + assets/)
 zybo-audio-web.service   systemd unit

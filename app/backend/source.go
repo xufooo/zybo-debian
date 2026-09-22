@@ -1,17 +1,16 @@
-// SPDX-License-Identifier: GPL-2.0-only
-// source.go — source management
+// source.go -- audio source management
 //
-// Design: **source processes are managed by systemd**, and the backend only "translates" --
-// turning the WebUI selection into `systemctl start/stop <unit>`. In the image shairport-sync.service / bluealsa-aplay.service
-// are both enabled and work out of the box; the WebUI "stop" therefore really stops them.
+// Design: **the source processes are managed by systemd**; the backend only "translates" -- turning the WebUI's choice into
+// `systemctl start/stop <unit>`. In the image, shairport-sync.service / bluealsa-aplay.service
+// are both enabled and work out of the box, so the WebUI's "stop" really does stop them.
 //
 // ⚠️ Why this was changed (three problems with the old implementation):
-//   ① The backend spawned shairport-sync itself with exec.Command, while systemd had already started one at boot
-//      ⇒ AirPlay port conflict, and the spawned one failed to bind and exited;
-//   ② `-d` daemonized it, and after the parent exited the backend never reaped it ⇒ a <defunct> zombie was left in the process table;
-//   ③ Clicking "stop" in the WebUI only killed the process it had spawned, while the systemd one kept playing ⇒ the button was fake.
+//   ① the backend started shairport-sync itself with exec.Command, while systemd had already started one at boot
+//      => AirPlay port conflict, and the spawned one failed to bind and exited;
+//   ② `-d` made it daemonize, and the backend never reaped it after the parent exited => a <defunct> zombie was left in the process table;
+//   ③ clicking "stop" in the WebUI killed only the process it had spawned, while the systemd one kept playing => the button was fake.
 //
-// The one without a systemd unit (DLNA's gmediarender) is still spawned directly, and its child process is reaped on the exit signal.
+// Anything without a systemd unit (DLNA's gmediarender) is still spawned directly, and its child process is reaped on the final shutdown signal.
 
 package main
 
@@ -30,13 +29,13 @@ type sourceManager struct {
 	procs  map[string]*exec.Cmd
 }
 
-// source → systemd units (the order is the dependency order)
+// source -> systemd units (the order is the dependency order)
 var sourceUnits = map[string][]string{
 	"airplay":   {"shairport-sync.service"},
 	"bluetooth": {"bluealsa.service", "bluealsa-aplay.service"},
 }
 
-// source → command run directly (not packaged as a systemd unit)
+// source -> directly run commands (the ones not packaged as systemd units)
 var sourceCommands = map[string]string{
 	"dlna": "gmediarender",
 }
@@ -54,21 +53,21 @@ func (sm *sourceManager) init() error {
 	}
 	for name, cmd := range sourceCommands {
 		if _, err := exec.LookPath(cmd); err != nil {
-			log.Printf("Source '%s': %s not in PATH, unavailable", name, cmd)
+			log.Printf("Source '%s': %s is not in PATH, unavailable", name, cmd)
 		} else {
 			log.Printf("Source '%s': %s available", name, cmd)
 		}
 	}
 
-	// At boot systemd may already have started a source, and the state must reflect that faithfully (otherwise the UI shows "idle")
+	// At boot systemd may have already started a source; the state must reflect that faithfully (otherwise the UI shows "idle")
 	if unitActive("shairport-sync.service") {
 		sm.active = "airplay"
-		log.Printf("Detected AirPlay already running on the system (shairport-sync.service)")
+		log.Printf("detected that the system is already running AirPlay (shairport-sync.service)")
 	}
 	return nil
 }
 
-// sourceAvailable reports whether a source is currently usable (so the UI can gray out its button).
+// sourceAvailable reports whether a source can currently be used (so the UI can grey out the button).
 func sourceAvailable(name string) bool {
 	if units, ok := sourceUnits[name]; ok {
 		for _, u := range units {
@@ -102,7 +101,7 @@ func unitActive(unit string) bool {
 	return err == nil && strings.TrimSpace(out) == "active"
 }
 
-// ── start / stop ──────────────────────────────────────────────────────
+// ── Start / stop ──────────────────────────────────────────────────────
 
 func (sm *sourceManager) startAirPlay() error   { return sm.startUnitSource("airplay") }
 func (sm *sourceManager) startBluetooth() error { return sm.startUnitSource("bluetooth") }
@@ -118,7 +117,7 @@ func (sm *sourceManager) startUnitSource(name string) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	// Stop the other sources first so that only one runs at a time
+	// stop the other sources first, so that only one runs at a time
 	sm.stopAllLocked()
 
 	for _, u := range units {
@@ -134,7 +133,7 @@ func (sm *sourceManager) startUnitSource(name string) error {
 func (sm *sourceManager) startDLNA() error {
 	cmdName := sourceCommands["dlna"]
 	if _, err := exec.LookPath(cmdName); err != nil {
-		return fmt.Errorf("%s not in PATH (the DLNA renderer is not installed in this image)", cmdName)
+		return fmt.Errorf("%s is not in PATH (this image has no DLNA renderer installed)", cmdName)
 	}
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
@@ -150,7 +149,7 @@ func (sm *sourceManager) startDLNA() error {
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("%s: %w", cmdName, err)
 	}
-	// A goroutine must reap it, otherwise a zombie is left after the process exits (the old implementation missed this step)
+	// a goroutine must reap it, otherwise a zombie is left after the process exits (the old implementation missed this step)
 	go func() {
 		if err := cmd.Wait(); err != nil {
 			log.Printf("%s exited: %v", cmdName, err)
@@ -179,7 +178,7 @@ func (sm *sourceManager) stopAllLocked() {
 			}
 		}
 	}
-	// The directly spawned one (DLNA) must be stopped too
+	// directly spawned sources (DLNA) must be stopped as well
 	for name, cmd := range sm.procs {
 		if cmd != nil && cmd.Process != nil {
 			log.Printf("Stopping source: %s (pid %d)", name, cmd.Process.Pid)
@@ -191,7 +190,7 @@ func (sm *sourceManager) stopAllLocked() {
 	sm.active = "idle"
 }
 
-// sourceStates provides each source's availability to /api/status (the UI uses it to gray out buttons).
+// sourceStates feeds /api/status with each source's availability (the UI greys out buttons with it).
 func sourceStates() map[string]bool {
 	return map[string]bool{
 		"airplay":   sourceAvailable("airplay"),

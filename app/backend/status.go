@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0-only
 // status.go — system status collection + periodic push
 
 package main
@@ -13,31 +12,33 @@ import (
 
 var startTime = time.Now()
 
-// ── "Is it playing?" -- the sound card is the only honest signal ───────
+// ── "is it playing?": the only honest signal is the sound card itself ────────────────
 //
-// This used to be an in-memory flag: set when a source was selected, set again
-// when metadata appeared with a title, and NEVER cleared -- while a backend
-// restart reset it to false. The panel therefore said "No source connected"
-// while music was playing, or "airplay connected" while nothing was playing
-// (reported on hardware, 2026-09-15).
+// This used to be an in-memory flag: it was set true when a source was selected,
+// and true again when a title showed up in the metadata, and it **never went back to
+// false**; a backend restart reset it to false. Consequences (the author
+// measured this on 2026-09-15): while AirPlay really was playing, the panel showed
+// "no source connected", or showed "airplay connected" while nothing was playing at
+// all — the first reported "not playing" as "no source connected", the second
+// reported "source selected" as "device connected".
 //
-// Every source (AirPlay / Bluetooth / local MPD) ends up writing the same sound
-// card, so the card's PCM state is the honest answer: `state: RUNNING` means
-// audio is actually flowing (the driver writes "closed" when the device is not
-// open). One /proc file read, microseconds, no side effects.
+// Every source (AirPlay / Bluetooth / local MPD) ends up writing the same sound card,
+// so the card's own PCM status is the most direct reading: `state: RUNNING` means it
+// really is producing sound (the file reads "closed" while the device is not open).
+// It is one /proc read: microseconds, no side effects (far cheaper than amixer's 23 ms).
 //
-// It is a variable so tests can point it at a fixture file instead of a board.
+// It is a variable so it can be tested offline: the test points it at a fixture file and does not depend on a real board.
 var pcmStatusPath = "/proc/asound/card0/pcm0p/sub0/status"
 
 func systemIsPlaying() bool {
 	out, err := ioutilReadFile(pcmStatusPath)
 	if err != nil {
-		return false // no such file (no card / wrong path) means not playing
+		return false // no such file (no sound card / wrong path) means nothing is playing
 	}
 	return strings.Contains(string(out), "state: RUNNING")
 }
 
-// ── System status ─────────────────────────────────────────────────────
+// ── system status ─────────────────────────────────────────────────────
 
 func getSystemStatus() SystemStatus {
 	return SystemStatus{
@@ -49,7 +50,7 @@ func getSystemStatus() SystemStatus {
 }
 
 func getCPUPercent() int {
-	// Read CPU usage from /proc/stat
+	// read CPU usage from /proc/stat
 	data, err := ioutilReadFile("/proc/stat")
 	if err != nil {
 		return 0
@@ -81,7 +82,7 @@ func getMemUsedMB() int {
 	}
 	for _, line := range strings.Split(string(data), "\n") {
 		if strings.HasPrefix(line, "MemTotal:") {
-			// No complex analysis here, just look at MemAvailable
+			// no complex analysis: just look at MemAvailable
 		}
 		if strings.HasPrefix(line, "MemAvailable:") {
 			fields := strings.Fields(line)
@@ -94,15 +95,13 @@ func getMemUsedMB() int {
 	return 80 // fallback
 }
 
-// ── Status push ───────────────────────────────────────────────────────
-
-// buildStatus is the ONE place that assembles APIStatus: both the HTTP
-// /api/status handler and the WebSocket pusher call it.
+// buildStatus is the **only** place where status is assembled: both HTTP /api/status
+// and the WebSocket push go through it.
 //
-// Why it exists (2026-09-15): the two used to build their own APIStatus, and
-// adding volume_db only to the HTTP copy left the WebSocket pushing volume_db=0
-// once a second, which overwrote the UI value -- correct on page load, wrong a
-// second later. Status fields may only be assembled in this function.
+// Why (2026-09-15): the two paths each built their own APIStatus, so when volume_db was
+// added only the HTTP copy was updated; the WebSocket then pushed a volume_db=0 payload
+// every second and overwrote the UI — right just after a page refresh, wrong a moment
+// later. Status fields may only be assembled in this one function.
 func buildStatus() APIStatus {
 	return APIStatus{
 		Version: appVersion,
@@ -110,11 +109,10 @@ func buildStatus() APIStatus {
 		Title:   currentTitle,
 		Artist:  currentArtist,
 		Album:   currentAlbum,
-		// Ask the sound card, not an in-memory flag (see systemIsPlaying)
+		// read the sound card's real state, not an in-memory flag (see the note on systemIsPlaying)
 		Playing: systemIsPlaying(),
-		// Read the mixer back: the WebUI/REST writes it and bluealsa-aplay
-		// (Bluetooth) moves it (AirPlay no longer touches it since
-		// ignore_volume_control=yes), so the UI must follow it.
+		// read back the mixer: WebUI / REST writes it, and Bluetooth's bluealsa-aplay pushes it
+		// (AirPlay's ignore_volume_control=yes was changed to leave it alone), so the UI must follow it (see volume.go)
 		Volume:   readSystemVolume(currentVolume),
 		VolumeDB: systemVolumeDB(currentVolume),
 		DSP:      dspStatusSnapshot(),
@@ -123,6 +121,8 @@ func buildStatus() APIStatus {
 	}
 }
 
+// ── status push ───────────────────────────────────────────────────────
+
 func statusPusher(hub *wsHub, sm *sourceManager) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
@@ -130,12 +130,12 @@ func statusPusher(hub *wsHub, sm *sourceManager) {
 	var lastChecksum string
 
 	for range ticker.C {
-		// Collect metadata
+		// collect metadata
 		collectMetadata()
 
 		status := buildStatus()
 
-		// Push only when the state changes (simple checksum)
+		// push only when the state changed (simple checksum)
 		jsonBytes, _ := json.Marshal(status)
 		checksum := string(jsonBytes)
 		if checksum != lastChecksum {
@@ -145,7 +145,7 @@ func statusPusher(hub *wsHub, sm *sourceManager) {
 	}
 }
 
-// ── File reading (Go 1.16+ uses os.ReadFile, no more io/ioutil) ───────
+// ── file reading (Go 1.16+ uses os.ReadFile, no longer io/ioutil) ────────────
 
 var ioutilReadFile = os.ReadFile // Go 1.17+
 var osReadFile = os.ReadFile

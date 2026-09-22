@@ -1,49 +1,40 @@
-// SPDX-License-Identifier: GPL-2.0-only
-// volume.go — the one system volume knob: the codec's ALSA "Master" control
+// volume.go -- the **only** volume knob in the system: the codec's ALSA "Master" control
 //
-// The codec mixer is the only volume control in this product:
+// This product has exactly one source of truth for volume, the codec's hardware mixer:
 //   - the REST API / WebUI writes it (POST /api/volume)
-//   - shairport-sync writes it for AirPlay (alsa.mixer_control_name = "Master"),
-//     so the sender's volume slider moves the very same knob
-//   - bluealsa-aplay writes it for Bluetooth (--volume=mixer)
-//   - mpd never touches it (mixer_type "none")
+//   - AirPlay's shairport-sync writes it (alsa.mixer_control_name = "Master"),
+//     so the volume slider on the phone pushes **the same** knob
+//   - Bluetooth's bluealsa-aplay writes it (--volume=mixer)
+//   - mpd does not touch it at all (mixer_type "none")
 //
-// Every source therefore plays at unity gain into one shared control, and
-// switching sources cannot change the loudness.
+// Every source enters this one control at unity gain, so **switching sources does not jump in volume**.
 //
-// The API must also read the control back: a phone (AirPlay) or a Bluetooth
-// remote can move it at any time, and an in-memory copy goes stale across a
-// reboot -- the WebUI showed 80% while the hardware actually sat at 70%.
+// Besides writing, the backend must also **read back**: the phone (AirPlay) or a Bluetooth remote can change it at any time, and a copy that lives
+// only in memory goes stale on restart -- there was once a WebUI showing 80% while the hardware actually sat at 70%.
 //
-// IMPORTANT: the control's *percentage* and its *dB* are not the same thing.
-// Measured on this board (2026-09-15):
+// ⚠️ Key point: this control's **percentage and dB are not the same thing** (measured 2026-09-15):
 //
-//	raw  0..47 : the driver reports -99999.99dB (no dB mapping) -> DEAD ZONE, silence
+//	raw  0..47 : the driver reports -99999.99dB (no dB mapping) -> **dead zone, nearly silent**
 //	raw 48     : -74 dB
-//	raw 102    : -20 dB      (what ALSA calls 80%)
-//	raw 122    :   0 dB      (what ALSA calls 96%)
-//	raw 127    :  +5 dB      (what ALSA calls 100%) -> digital gain, i.e. clipping
+//	raw 102    : -20 dB      (ALSA's 80%)
+//	raw 122    :   0 dB      (ALSA's 96%)
+//	raw 127    :  +5 dB      (ALSA's 100%) -> **digital clipping**
 //
-// So writing a raw percentage is wrong at both ends: the first 37% of the slider
-// is silent and the last 4% adds up to +5 dB of gain ("stuck at a value, then it
-// distorts when turned up"). This file therefore calibrates in dB:
+// So writing by "raw percentage" is wrong at both ends: the first 37% of the slider is all silence, and the last 4% adds +5 dB of gain to the codec
+// (audibly, "turn it up and it blasts"). This was therefore changed to **calibration by dB**:
 //
-//	0% -> mute (raw 0);  1..100% -> -60 dB .. 0 dB
+//	0% -> mute (raw 0); 1..100% -> -60dB ... 0dB
 //
-// 100% is exactly 0 dB (unity gain, no clipping) and the whole slider is useful.
+// 100% is exactly 0 dB (unity gain, no more clipping), and the whole slider is usable.
+// The cost: one amixer call takes about 23ms on this 650MHz Cortex-A9, so reads are briefly cached.
 //
-// Cost: one `amixer` run takes about 23 ms on this 650 MHz Cortex-A9, so the
-// value is cached briefly.
-//
-// SECOND PITFALL: the mixer only has a 1 dB grid (raw steps by exactly 1 dB),
-// while squeezing 60 dB into 100 positions means 1.667% per step. Several slider
-// positions therefore cannot be represented, which is where "I set 50 and it
-// reads back 52" came from (measured on hardware, 2026-09-15). The rules here:
-//   - write: pctToDB, then ROUND to whole dB (Go's int() truncates toward zero,
-//     so int(x+0.5) turns -29.5 into -29 -- that was the missing 1 dB), then raw
-//   - read: derive pct from raw, and after writing the control seed the cache
-//     with the value from that same grid (quantizePct), so what the UI shows and
-//     what a later read returns can never disagree.
+// ⚠️ Second gotcha: **the mixer only has a 1 dB grid** (each raw step is exactly 1 dB), while 60 dB is squeezed into 100 steps, i.e.
+// 1.667% per step. So several of the 10 positions on the slider do not land on the grid, which is where "set 50, read back 52" comes from
+// (measured by the user on 2026-09-15: "webui shows 62? actually 80"). The rule here is:
+//   - write: after pctToDB, **round** to an integer dB (Go's int() truncates toward zero for negative numbers, so adding 0.5 first
+//     would cut -29.5 down to -29 -- that was exactly the cause of the 1 dB error), then write raw
+//   - read: derive pct back from raw, and right after writing the control seed this **same grid value** into the cache
+//     (quantizePct), so the value the UI shows and the value read back afterwards always agree and never jump on their own.
 
 package main
 
@@ -57,20 +48,19 @@ import (
 )
 
 const (
-	// mixerControl is the codec's hardware volume control (the only one we use).
+	// mixerControl: the codec's hardware volume control (we use only this one).
 	mixerControl = "Master"
-	// volumeCacheTTL bounds how often the mixer is actually read.
+	// volumeCacheTTL: limits how often the mixer is really read.
 	volumeCacheTTL = 2 * time.Second
 
-	// volumeMinDB/volumeMaxDB: the dB span that slider 1%..100% covers.
-	// 100% = 0 dB (unity gain); the codec goes on to +5 dB, which is pure gain.
+	// volumeMinDB / volumeMaxDB: the dB range corresponding to slider 1%..100%.
+	// 100% = 0 dB (unity gain); never go past it -- the codec has another +5 dB at the top, and that is clipping gain.
 	volumeMinDB = -60.0
 	volumeMaxDB = 0.0
 
-	// Measured: raw 48..127 is exactly -74dB..+5dB on this codec, i.e. 1 dB per
-	// step, so raw = dB + 122 (0 dB == 122). Values are written as raw integers
-	// rather than "<n>dB" because amixer uses GNU getopt and an argument like
-	// "-12.0dB" is parsed as an option and rejected.
+	// Measured: this control's raw 48..127 is exactly -74dB..+5dB, **1 dB per step**.
+	// So raw = dB + 122 (0dB -> 122). Writes use raw rather than "<n>dB":
+	// amixer uses GNU getopt, so an argument like "-12.0dB" with a minus sign is taken as an option and errors out.
 	mixerZeroDBRaw = 122
 )
 
@@ -84,8 +74,7 @@ var (
 // matches "[-20.00dB]" or "-99999.99dB"
 var volumeDBRe = regexp.MustCompile(`\[(-?[0-9.]+)dB\]`)
 
-// pctToDB converts the 0..100 slider value to a mixer dB value. 0 gets the
-// minimum (setSystemVolume special-cases it to real mute).
+// pctToDB converts the 0..100 slider value into mixer dB. 0 is handled separately as mute (see setSystemVolume).
 func pctToDB(pct int) float64 {
 	if pct <= 0 {
 		return volumeMinDB
@@ -96,8 +85,7 @@ func pctToDB(pct int) float64 {
 	return volumeMinDB + (volumeMaxDB-volumeMinDB)*float64(pct)/100.0
 }
 
-// dbToPct converts a mixer dB reading back to a slider percentage; the dead zone
-// (no dB mapping) counts as 0%.
+// dbToPct converts the mixer's dB reading back into a slider percentage; no dB mapping (dead zone) counts as 0%.
 func dbToPct(db float64) int {
 	if db <= volumeMinDB {
 		return 0
@@ -108,9 +96,8 @@ func dbToPct(db float64) int {
 	return int((db-volumeMinDB)/(volumeMaxDB-volumeMinDB)*100.0 + 0.5)
 }
 
-// mixerRawForPct returns the raw value to write for a slider position
-// (0 means mute). The rounding must use math.Round: on negative numbers
-// int(x+0.5) truncates toward zero and lands one dB high.
+// mixerRawForPct computes the raw value to write into the mixer for a slider value (0 means mute).
+// That intermediate rounding must use math.Round: int(x+0.5) truncates toward zero for negative numbers.
 func mixerRawForPct(pct int) int {
 	if pct <= 0 {
 		return 0
@@ -125,19 +112,17 @@ func mixerRawForPct(pct int) int {
 	return raw
 }
 
-// quantizePct maps a requested slider position onto the percentage the mixer
-// grid can actually reach. On 1 dB hardware the two can differ by one step;
-// using this keeps "what we write" and "what a read returns" the same value.
+// quantizePct folds the requested slider value onto the percentage the mixer grid **can actually land on**.
+// On 1dB/step hardware the two can differ by at most ±1 step; this keeps "what is written" and "what is read back" the same value.
 func quantizePct(pct int) int {
 	return dbToPct(float64(mixerRawForPct(pct) - mixerZeroDBRaw))
 }
 
-// parseMixerDB pulls the dB value out of `amixer sget` output, e.g.
+// parseMixerDB extracts the dB from `amixer sget` output, for example
 //
 //	Front Left: Playback 102 [80%] [-20.00dB]
 //
-// It returns (0,false) when there is no dB field, and (volumeMinDB,true) for the
-// dead zone (-99999.99dB), which is silence.
+// When it cannot be obtained it returns (0,false). The dead zone (-99999.99dB) counts as mute and returns (volumeMinDB,true).
 func parseMixerDB(out string) (float64, bool) {
 	m := volumeDBRe.FindStringSubmatch(out)
 	if m == nil {
@@ -153,8 +138,8 @@ func parseMixerDB(out string) (float64, bool) {
 	return db, true
 }
 
-// readSystemVolume returns the live slider percentage (calibrated in dB), or
-// fallback when the control cannot be read. Cached for volumeCacheTTL.
+// readSystemVolume returns the mixer's live percentage (calibrated by dB); it falls back to fallback when it cannot be read.
+// The result is cached for volumeCacheTTL.
 func readSystemVolume(fallback int) int {
 	volumeMu.Lock()
 	defer volumeMu.Unlock()
@@ -174,16 +159,16 @@ func readSystemVolume(fallback int) int {
 	return pct
 }
 
-// systemVolumeDB returns the dB reading from the same cache readSystemVolume
-// uses, so the UI can show the dB value and agree with `amixer`.
+// systemVolumeDB returns the dB from the same cache as readSystemVolume (for showing dB directly in the UI,
+// so that it matches what amixer shows and there is no more argument over two scales, "62% or 80%").
 func systemVolumeDB(fallback int) float64 {
-	readSystemVolume(fallback) // keeps the cache fresh (a hit does not run amixer)
+	readSystemVolume(fallback) // keep the cache fresh (a cache hit does not actually call amixer)
 	volumeMu.Lock()
 	defer volumeMu.Unlock()
 	return volumeDB
 }
 
-// setSystemVolume writes the mixer using the dB calibration; 0% is real mute.
+// setSystemVolume writes the mixer (calibrated by dB, landing on raw). 0% writes raw 0 directly (true mute).
 func setSystemVolume(pct int) error {
 	if pct <= 0 {
 		return exec.Command("amixer", "-c", "0", "sset", mixerControl, "0").Run()
@@ -192,10 +177,8 @@ func setSystemVolume(pct int) error {
 		strconv.Itoa(mixerRawForPct(pct))).Run()
 }
 
-// noteSystemVolume seeds the cache after we wrote the control ourselves, so the
-// UI reflects the change immediately instead of waiting for the next read. It
-// seeds the value quantized onto the grid, so the UI does not show 50 and then
-// jump to 52.
+// noteSystemVolume seeds the cache after we write the control ourselves, so the UI reflects the change immediately
+// instead of waiting for the next read-back. What is seeded is the value **folded onto the grid**, so the UI does not show 50 and then jump to 52.
 func noteSystemVolume(pct int) {
 	volumeMu.Lock()
 	if pct <= 0 {

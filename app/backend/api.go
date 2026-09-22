@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0-only
 // api.go — REST API handlers
 
 package main
@@ -14,7 +13,7 @@ import (
 	"strings"
 )
 
-// ── Structs (mirroring the JSON responses) ───────────────────────────
+// ── Structs (mapping to the JSON responses) ──────────────────────────
 
 type BandStatus struct {
 	Type   string  `json:"type"`
@@ -28,12 +27,12 @@ type DSPStatus struct {
 	Enabled   bool   `json:"enabled"`
 	Bypass    bool   `json:"bypass"`
 	Preset    string `json:"preset"`
-	// PreampDB is the headroom compensation actually folded into the coefficients
-	// (dB, <=0): when the EQ boosts, this much is taken off so the cascade stays
-	// within 0 dBFS (see headroom.go). 0 means no compensation was needed.
+	// PreampDB is the headroom compensation **actually folded into the coefficients** (dB, ≤0): when the EQ boosts, this much is
+	// automatically cut so the cascaded output never exceeds 0dBFS (see dsp_headroom.go). 0 = no compensation needed.
 	PreampDB    float64      `json:"preamp_db"`
 	BandsActive int          `json:"bands_active"`
 	Limiter     bool         `json:"limiter"`
+	LimiterMode string       `json:"limiter_mode"`
 	LimThrDB    float64      `json:"lim_thr_db"`
 	LimAttMs    float64      `json:"lim_att_ms"`
 	LimRelMs    float64      `json:"lim_rel_ms"`
@@ -55,14 +54,12 @@ type APIStatus struct {
 	Album   string `json:"album"`
 	Playing bool   `json:"playing"`
 	Volume  int    `json:"volume"`
-	// VolumeDB is the dB reading of Volume. The slider scale is calibrated in dB
-	// and is NOT the percentage amixer reports for the raw register (60 dB across
-	// 100 positions = 1.667%/step, while raw steps by 1 dB), so the UI has to show
-	// the dB value to agree with amixer.
+	// VolumeDB is the dB reading of Volume. The slider scale is calibrated in dB, which is not the same scale as
+	// amixer's raw register percentage (60 dB over 100 steps = 1.667%/step, raw is 1 dB per step), so only the dB display adds up.
 	VolumeDB float64      `json:"volume_db"`
 	DSP      DSPStatus    `json:"dsp"`
 	System   SystemStatus `json:"system"`
-	// Sources reports whether each source is available (installed in this image); the UI greys out buttons based on it
+	// Sources reports whether each source is available (installed in this image or not); the UI uses it to grey out buttons
 	Sources map[string]bool `json:"sources"`
 }
 
@@ -73,10 +70,14 @@ var (
 	currentTitle  = ""
 	currentArtist = ""
 	currentAlbum  = ""
-	// There used to be a currentPlaying flag here. It was removed: it was never
-	// accurate and never went back to false. "Is it playing" now comes from the
-	// sound card itself -- see systemIsPlaying() in status.go.
-	currentVolume = 80
+	// Note: there used to be a currentPlaying in-memory flag here, now removed — it was both inaccurate and never
+	// cleared, so "is it playing" comes from systemIsPlaying() in status.go reading the sound card state directly (see the note there).
+	// Default volume 90% (−6 dB): the design brief of 2026-09-20 asked for "default 90%, leave some headroom".
+	// Why it is worth keeping: the chain already has 18 dB of headroom covering the convolution's +11.5 dB, but that is there to **prevent clipping inside the chain**;
+	// the extra 6 dB at the ALSA stage covers "material already at 0 dBFS full scale, after the limiter",
+	// and it also steers clear of the ssm2602's nonlinear region near full scale. A value the user changed by hand is persisted
+	// (see the Volume field in state.go) and is not overwritten by this default.
+	currentVolume = 90
 	currentPreset = "flat"
 	dspEnabled    = true
 	dspBypass     = false
@@ -176,8 +177,8 @@ func handleDSPEQ(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// handleDSPLimiter sets the peak limiter: {"enabled":true,"thr_db":-1.0,"att_ms":1,"rel_ms":80}
-// All fields are optional; only the ones that were sent are written.
+// handleDSPLimiter configures the peak limiter: {"enabled":true,"thr_db":-1.0,"att_ms":1,"rel_ms":80}
+// All fields are optional; only the ones supplied are written.
 func handleDSPLimiter(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "POST only", http.StatusMethodNotAllowed)
@@ -188,10 +189,28 @@ func handleDSPLimiter(w http.ResponseWriter, r *http.Request) {
 		ThrDB   *float64 `json:"thr_db"`
 		AttMs   *float64 `json:"att_ms"`
 		RelMs   *float64 `json:"rel_ms"`
+		// "feedback" = the 0.1 feedback design (no lookahead); "truepeak" = the 0.2 lookahead version.
+		// ⚠️ The two modes use **different formulas** for att_ms/rel_ms (multiplicative in the linear domain vs first order in the log2 domain),
+		//    so the mode is switched first and the coefficients are then recomputed on the same machine (see dsp_limiter_tp.go).
+		Mode *string `json:"mode"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+
+	// Validate the mode first: an invalid value gets a 400 outright and is never silently treated as the default
+	if body.Mode != nil {
+		switch *body.Mode {
+		case "feedback", "truepeak":
+		default:
+			http.Error(w, "mode only supports feedback / truepeak", http.StatusBadRequest)
+			return
+		}
+		if err := dspSetLimiterTP(*body.Mode == "truepeak"); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	enabled := dspLimiterEnabled
@@ -219,20 +238,22 @@ func handleDSPLimiter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("limiter: %s thr=%.1f dBFS att=%.2f ms rel=%.0f ms",
-		onOff(dspLimiterEnabled), dspLimiterThrDB, dspLimiterAttMs, dspLimiterRelMs)
+	log.Printf("limiter: %s/%s thr=%.1f dBFS att=%.2f ms rel=%.0f ms",
+		onOff(dspLimiterEnabled), limiterModeName(), dspLimiterThrDB, dspLimiterAttMs, dspLimiterRelMs)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(dspStatusSnapshot())
 }
 
-// handleDSPCheck reads back CTRL and all 30 coefficients and compares them against the software's expectation (post-deployment self-check).
+// handleDSPCheck reads back CTRL and all 30 coefficients and compares them against what the software expects (for the post-deploy self-check).
 func handleDSPCheck(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var ctrl uint32
 	coeffs := []int32{}
 	if dspAvailable {
-		ctrl = regRead(regCtrl) & ctrlMask
+		// Report every **readable** bit (the 0.2 bitstream has bit17 BANK_SEL / bit18 LIM_TP):
+		// that way "did the limiter mode actually reach the hardware" is visible here instead of being guessed by ear.
+		ctrl = regRead(regCtrl) & dspCtrlVerifyMask()
 		coeffs = dspDumpCoeffs()
 	}
 	resp := map[string]interface{}{
@@ -287,20 +308,28 @@ func handleVolume(w http.ResponseWriter, r *http.Request) {
 		body.Volume = 100
 	}
 
-	// ALSA volume: the single system knob, calibrated in dB (0% = mute,
-	// 100% = 0 dB). Do NOT write "<n>%": on this codec raw 0..47 has no dB
-	// mapping (silence) and raw 127 is +5 dB of gain, so a raw percentage is
-	// silent at the bottom and clips at the top (see volume.go).
+	// ALSA volume: the one knob for the whole system, **calibrated in dB** (0% = mute, 100% = 0 dB).
+	// ⚠️ Do not write "<n>%": raw 0..47 on this control is a dead zone (the driver has no dB mapping) and raw 127 is
+	// +5 dB of clipping gain, so writing a percentage gives "silent at the bottom, blasting at the top" (see volume.go)
 	if err := setSystemVolume(body.Volume); err != nil {
-		// A failed write must be reported: this used to log and still answer 200,
-		// so external scripts believed the volume had been set. Do not seed the
-		// cache either -- a value that was never written is not the current value.
+		// A failed write must be reported (it once only logged while still returning 200, so external scripts thought it had worked).
+		// No caching either: a value that was not written is not the current value.
 		log.Printf("volume: %v", err)
 		http.Error(w, "mixer write failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	// Note: historically this also called dspSetMasterVolume (the FPGA master volume). The new hardware has no such
+	// register, that function is already a no-op (see dsp.go), and digital volume goes only through the ALSA Master above.
 	currentVolume = body.Volume
 	noteSystemVolume(body.Volume)
+	// Loudness compensation follows the volume: when the volume changes, the compensation is re-merged for the new volume and downloaded.
+	// (Audyssey Dynamic EQ / V4A Equal Loudness both behave this way.)
+	if loudnessOn && dspAvailable {
+		if err := reapplyCurrentChain(); err != nil {
+			log.Printf("loudness compensation re-download failed: %v", err)
+		}
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -315,7 +344,7 @@ func handleSourceSelect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Stop all existing sources, then start the new one
+	// Stop every existing source, start the new one
 	srcMgr.stopAll()
 
 	var err error
@@ -327,7 +356,7 @@ func handleSourceSelect(w http.ResponseWriter, r *http.Request) {
 	case "bluetooth":
 		err = srcMgr.startBluetooth()
 	case "idle":
-		// Stop everything, do not start a new source
+		// Stop everything, start no new source
 	default:
 		http.Error(w, "unknown source: "+body.Source, http.StatusBadRequest)
 		return
@@ -339,7 +368,7 @@ func handleSourceSelect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	currentSource = body.Source
-	clearMetadata() // switching sources must drop the previous track's info
+	clearMetadata() // switching source must clear the previous track's info (playing is decided by the sound card state, not set here)
 
 	log.Printf("Source switched: %s", body.Source)
 	w.WriteHeader(http.StatusOK)
@@ -423,8 +452,13 @@ func handleEQExport(w http.ResponseWriter, r *http.Request) {
 		Name:   currentPreset,
 		Preamp: 0,
 	}
-	for i := 0; i < maxHardwareBands; i++ {
+	// Export only the **active sections**: exporting disabled ones (Type=off, Freq=0) would just emit a line
+	// of fake "Fc 0 Hz" filters — that is noise, not information.
+	for i := 0; i < bandLimit(); i++ {
 		b := getBandConfig(i)
+		if isBandOff(b.Type) {
+			continue
+		}
 		cfg.Bands = append(cfg.Bands, EQBand{
 			Type:   FilterPeaking, // default — bands are peaking by design
 			Freq:   b.Freq,
@@ -448,19 +482,16 @@ func handleEQExport(w http.ResponseWriter, r *http.Request) {
 
 // ── Metadata ────────────────────────────────────────────────────────
 //
-// CURRENT STATE (measured on hardware, 2026-09-15): AirPlay shows no track info,
-// because shairport-sync metadata is disabled in the shipped configuration (the
-// whole `metadata = { ... }` block is commented out) and this file never exists.
-// The path below is the older file-based implementation; it is kept honest
-// rather than pretending to work.
+// ⚠️ Current state (measured 2026-09-15): **AirPlay yields no track information**, because shairport-sync's metadata
+// is off by default (in the release config the whole `metadata = { ... }` block is commented out), and this file does not exist at all.
+// The path below is only the historical "file-based" implementation, kept without pretending it works.
 //
-// Two traps for whoever wires this up:
-//  1. shairport's pipe name defaults to /tmp/shairport-sync-metadata (not the
-//     path below) and requires metadata = { enabled = "yes"; pipe_name = "..."; }
-//  2. that pipe is a FIFO, not a regular file: os.ReadFile blocks on open until
-//     a writer appears, which would stall the once-a-second status pusher.
-//     Read it from a long-lived goroutine instead, parsing <item> blocks
-//     (<type>core</type>, <code>minm|asar|asal</code>, <data>...</data>).
+// Two things to watch when metadata is really wired up (do not trip over them):
+//  1. shairport's pipe name defaults to /tmp/shairport-sync-metadata (not the one below), so
+//     metadata = { enabled = "yes"; pipe_name = "..."; } has to be turned on explicitly;
+//  2. that is a **FIFO**, not a regular file: os.ReadFile blocks in open until a writer appears, so once connected it would
+//     stall the whole status push (once per second). It must become a resident goroutine reading the stream and parsing items
+//     (<item><type>core</type><code>minm|asar|asal</code><data>…), rather than reading a file every time.
 var metadataPath = "/tmp/shairport-metadata"
 
 func collectMetadata() {
@@ -468,14 +499,14 @@ func collectMetadata() {
 	case "airplay":
 		data, err := osReadFile(metadataPath)
 		if err != nil {
-			// No file (the case in this image): the previous track's info has to
-			// be cleared, otherwise the panel stays stuck on the old title.
+			// The file is not there (which is the case in this image) ⇒ the previous track's info must be cleared,
+			// otherwise the panel stays on the old track forever.
 			clearMetadata()
 			return
 		}
 		parseMetadata(string(data))
 	case "dlna":
-		// gmrender has no standard metadata
+		// gmrender has no standard metadata, so leave it empty
 		clearMetadata()
 	}
 }
@@ -484,9 +515,8 @@ func clearMetadata() {
 	currentTitle, currentArtist, currentAlbum = "", "", ""
 }
 
-// parseMetadata parses "title=... / artist=... / album=..." text.
-// It accumulates into locals and assigns at the end, so fields missing from the
-// file are cleared rather than left over from the previous track.
+// parseMetadata parses "title=… / artist=… / album=…" text.
+// Values accumulate in locals and are assigned as a whole: fields absent from the file are cleared instead of keeping the previous value.
 func parseMetadata(raw string) {
 	title, artist, album := "", "", ""
 	for _, line := range strings.Split(raw, "\n") {

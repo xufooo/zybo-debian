@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-2.0-only
-// volume_test.go — offline tests for the ALSA Master read-back and dB calibration
+// volume_test.go -- offline tests for ALSA Master read-back and dB calibration (no board needed)
 //
-// Background: on this codec the control's percentage and its dB are not the same
-// thing (measured 2026-09-15):
+// Background: the "percentage" of this control and dB are not the same thing (codec curve
+// measured 2026-09-15):
 //
 //	raw  0..47 : -99999.99dB (no dB mapping) -> dead zone
 //	raw 48     : -74 dB
-//	raw 102    : -20 dB      (what ALSA calls 80%)
-//	raw 122    :   0 dB      (what ALSA calls 96%)
-//	raw 127    :  +5 dB      (what ALSA calls 100%) -> clipping
+//	raw 102    : -20 dB      (ALSA reports 80%)
+//	raw 122    :   0 dB      (ALSA reports 96%)
+//	raw 127    :  +5 dB      (ALSA reports 100%) -> clipping
 //
-// Writing a raw percentage is therefore silent at the bottom and clipping at the
-// top; this file calibrates in dB instead: 0% = mute, 1..100% = -60..0 dB.
+// Writing by percentage would mean "silent at the bottom, blasting at the top", so the control
+// is calibrated in dB instead: 0% is silence, 1..100% = -60..0 dB.
 
 package main
 
@@ -39,17 +39,17 @@ func TestDBToPctRoundTrip(t *testing.T) {
 	}
 }
 
-// TestMixerGridRoundTrip covers the REAL hardware path (write raw -> read the dB
-// back -> convert to percent). The float round trip above cannot see the grid
-// problem.
+// TestMixerGridRoundTrip exercises the **real hardware path** (write raw -> read back dB ->
+// convert back to percentage); the ideal floating-point round trip above cannot catch grid
+// problems.
 //
-// The regression values come from a hardware measurement (2026-09-15): the WebUI
-// showed 62% while the control sat on -22.00 dB and read back as 63%. The cause
-// was setSystemVolume using int(pctToDB(pct)+0.5), where Go truncates toward
-// zero on negative numbers: 50 produced int(-29.5) = -29, i.e. raw 93 (-29 dB),
-// which then read back as 52.
+// The regression case comes from a user measurement on 2026-09-15: "the webui shows 62, but it is
+// actually 80":
+// at the time setSystemVolume stored raw as int(pctToDB(pct)+0.5), and Go truncates negative
+// numbers towards zero, so setting 50 computed int(-29.5) = -29 -> raw 93 (-29dB) -> read back 52.
+// Off by exactly that one grid step.
 func TestMixerGridRoundTrip(t *testing.T) {
-	// Pinned regressions: raw must land on the grid instead of drifting one dB
+	// Pinned regression points: raw must land on the grid and must not be 1 dB off through truncation
 	rawCases := map[int]int{50: 92, 62: 99, 100: 122, 1: 63}
 	for pct, wantRaw := range rawCases {
 		if got := mixerRawForPct(pct); got != wantRaw {
@@ -57,15 +57,14 @@ func TestMixerGridRoundTrip(t *testing.T) {
 		}
 	}
 
-	// Full sweep: what is written must read back as what the UI shows, within one
-	// grid step (1 dB = 1.667%)
+	// Exhaustive: the raw value written must read back as the value the UI shows, within one grid step (1dB=1.667%)
 	for pct := 1; pct <= 100; pct++ {
 		raw := mixerRawForPct(pct)
 		if raw < 1 || raw > 127 {
 			t.Fatalf("pct %d: raw %d out of range", pct, raw)
 		}
 		if db := raw - mixerZeroDBRaw; db > 0 {
-			t.Errorf("pct %d: raw %d gives %+ddB, must never exceed 0dB", pct, raw, db)
+			t.Errorf("pct %d: raw %d gives %+ddB, must never exceed 0dB (clipping)", pct, raw, db)
 		}
 		readBack := dbToPct(float64(raw - mixerZeroDBRaw))
 		if readBack != quantizePct(pct) {
@@ -74,7 +73,7 @@ func TestMixerGridRoundTrip(t *testing.T) {
 		if d := readBack - pct; d > 1 || d < -1 {
 			t.Errorf("pct %d: read back %d, off by more than one grid step", pct, readBack)
 		}
-		// Idempotent: once set it must not drift (otherwise the UI oscillates)
+		// Idempotent: once settled it must not drift on its own (otherwise the UI would swing 50->52->50)
 		if got := quantizePct(readBack); got != readBack {
 			t.Errorf("quantizePct not idempotent at pct %d: %d -> %d", pct, readBack, got)
 		}
@@ -100,7 +99,7 @@ func TestParseMixerDB(t *testing.T) {
 			want: -20, ok: true,
 		},
 		{
-			// 37% (raw 47) falls in this dead zone: the driver cannot report a dB value
+			// 37% (raw 47) falls in this dead zone: the driver cannot give a dB value
 			name: "dead zone (unmapped) counts as silence",
 			in:   "  Front Left: Playback 47 [37%] [-99999.99dB]\n",
 			want: volumeMinDB, ok: true,
@@ -129,7 +128,7 @@ func TestParseMixerDB(t *testing.T) {
 }
 
 func TestDeadZoneReadsAsZero(t *testing.T) {
-	// 37% (raw 47) is in the dead zone, so it must read as 0%, not 37%
+	// 37% (raw 47) is in the dead zone => it must read as 0%, not 37%
 	db, _ := parseMixerDB("  Front Left: Playback 47 [37%] [-99999.99dB]\n")
 	if pct := dbToPct(db); pct != 0 {
 		t.Errorf("dead zone should map to 0%%, got %d%%", pct)

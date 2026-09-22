@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0-only
 // config.go — Audio EQ Configuration File Parser
 //
 // Supports mainstream audio DSP config formats:
@@ -353,8 +352,8 @@ func ParseEQConfig(r io.Reader) (*EQPresetConfig, error) {
 
 // ── Apply config to FPGA DSP ─────────────────────────────────────────
 //
-// Takes the first N bands (up to the hardware limit of 6) and writes their
-// RBJ-computed Q3.15 coefficients to the FPGA coefficient block.
+// Takes the first N bands (up to the current engine's limit, see bandLimit())
+// and writes their RBJ-computed Q3.15 coefficients to the FPGA coefficient block.
 
 func (cfg *EQPresetConfig) ApplyToDSP() error {
 	if !dspAvailable {
@@ -364,13 +363,15 @@ func (cfg *EQPresetConfig) ApplyToDSP() error {
 	if n == 0 {
 		return fmt.Errorf("no bands in config")
 	}
-	if n > maxHardwareBands {
-		n = maxHardwareBands
+	// capacity is asked of bandLimit(): 6 sections for a 0.1 bitstream, maxSections for the 0.2 slot-table engine.
+	// (this is the 0.1 "fixed section numbers" legacy path; the chain API goes through chainToSlots.)
+	if limit := bandLimit(); n > limit {
+		n = limit
 	}
 	for i := 0; i < n; i++ {
 		b := cfg.Bands[i]
 		if b.Freq <= 0 || b.Q <= 0 {
-			// Invalid parameters: treat as bypass so no coefficients from the previous config are left behind
+			// invalid parameter: treat it as bypass, so that coefficients from the previous configuration are not left behind
 			if err := dspSetSlot(i, slotConfig{Type: "off"}); err != nil {
 				return err
 			}
@@ -387,7 +388,7 @@ func (cfg *EQPresetConfig) ApplyToDSP() error {
 		}
 	}
 	// Disable unused bands
-	for i := n; i < maxHardwareBands; i++ {
+	for i := n; i < bandLimit(); i++ {
 		if err := dspSetSlot(i, slotConfig{Type: "off"}); err != nil {
 			return err
 		}
@@ -401,8 +402,8 @@ func (cfg *EQPresetConfig) ApplyToDSP() error {
 
 // ── RBJ Peaking EQ ───────────────────────────────────────────────────
 
-// rbjPeakingEQ is the most commonly used section (all 6 WebUI sliders are it).
-// With gain = 0 dB, b1 == a1 and b2 == a2, so the transfer function is exactly 1 (exact pass-through).
+// rbjPeakingEQ is the most commonly used section (all 6 WebUI sliders are this one).
+// when gain = 0 dB, b1 == a1 and b2 == a2, so the transfer function is identically 1 (exact passthrough).
 func rbjPeakingEQ(freq, Q, gainDB, fs float64) (int32, int32, int32, int32, int32) {
 	A := math.Pow(10.0, gainDB/40.0)
 	omega := 2.0 * math.Pi * freq / fs
@@ -459,8 +460,8 @@ func rbjHighShelf(freq, Q, gainDB, fs float64) (int32, int32, int32, int32, int3
 	b1 := -2.0 * A * ((A - 1.0) + (A+1.0)*cos) * a0inv
 	b2 := A * ((A + 1.0) + (A-1.0)*cos - beta*sin) * a0inv
 	a1 := 2.0 * ((A - 1.0) - (A+1.0)*cos) * a0inv
-	// RBJ high shelf a2 = (A+1) - (A-1)cos - beta·sin, with **no leading minus sign**
-	// (the low shelf has +beta·sin; the two differ in the sign of a2, and getting it wrong inverts the whole high shelf)
+	// RBJ high shelf: a2 = (A+1) - (A-1)cos - beta·sin, **with no leading minus sign**
+	// (the low shelf is +beta·sin; the two differ in the sign of a2, and getting it wrong inverts the whole high shelf)
 	a2 := ((A + 1.0) - (A-1.0)*cos - beta*sin) * a0inv
 
 	return floatToQ315(b0), floatToQ315(b1), floatToQ315(b2),
@@ -470,6 +471,19 @@ func rbjHighShelf(freq, Q, gainDB, fs float64) (int32, int32, int32, int32, int3
 // ── RBJ Low/High Pass Filters ────────────────────────────────────────
 
 func rbjLowPass(freq, Q, fs float64) (int32, int32, int32, int32, int32) {
+	b0, b1, b2, a1, a2 := rbjLowPassFloat(freq, Q, fs)
+	return floatToQ315(b0), floatToQ315(b1), floatToQ315(b2),
+		floatToQ315(a1), floatToQ315(a2)
+}
+
+// rbjLowPassFloat is the **floating-point** version of rbjLowPass: for callers that "must scale first, then quantize".
+//
+// Why it is needed (measured while implementing ViPERBass on 2026-09-21): the numerator of a very low-frequency low-pass **does not fit** in Q3.15 --
+// at 40 Hz / Q0.53, b0 = 6.8e-6, while 1 LSB of Q3.15 is 3.05e-5 => b0/b1/b2 all round to 0,
+// and the low-pass output is identically 0 (not "a bit off", but **nothing at all**). ViPERBass's countermeasure is to multiply the whole numerator by a power of two k
+// while dividing the input by k ahead of it (see viperbass.go), which requires the floating-point coefficients **before quantization**:
+// taking the already quantized int32 and multiplying by k afterwards would amplify the quantization error by k as well.
+func rbjLowPassFloat(freq, Q, fs float64) (b0, b1, b2, a1, a2 float64) {
 	omega := 2.0 * math.Pi * freq / fs
 	sin := math.Sin(omega)
 	cos := math.Cos(omega)
@@ -478,14 +492,12 @@ func rbjLowPass(freq, Q, fs float64) (int32, int32, int32, int32, int32) {
 	a0 := 1.0 + alpha
 	a0inv := 1.0 / a0
 
-	b0 := (1.0 - cos) / 2.0 * a0inv
-	b1 := (1.0 - cos) * a0inv
-	b2 := (1.0 - cos) / 2.0 * a0inv
-	a1 := -2.0 * cos * a0inv
-	a2 := (1.0 - alpha) * a0inv
-
-	return floatToQ315(b0), floatToQ315(b1), floatToQ315(b2),
-		floatToQ315(a1), floatToQ315(a2)
+	b0 = (1.0 - cos) / 2.0 * a0inv
+	b1 = (1.0 - cos) * a0inv
+	b2 = (1.0 - cos) / 2.0 * a0inv
+	a1 = -2.0 * cos * a0inv
+	a2 = (1.0 - alpha) * a0inv
+	return
 }
 
 func rbjHighPass(freq, Q, fs float64) (int32, int32, int32, int32, int32) {
