@@ -16,9 +16,10 @@
 # If the board ever needs one of the disabled ones, enable it here AND update
 # the hook + offline gate (tools/offline_release_check.sh C8).
 #
-# ABI note: built on ubuntu-24.04 (glibc 2.39) for trixie (glibc 2.41).
-# Binaries built against the OLDER libc run on the newer one; the reverse
-# would break. Verify on the board with `ldd /usr/bin/shairport-sync`.
+# ABI note: built INSIDE debian:trixie-slim, so every soname matches the board
+# by construction (an earlier attempt built on ubuntu-24.04/noble and produced
+# libavcodec.so.60/libavutil.so.58/libconfig.so.9 while the board has
+# .61/.59/.11 — unrunnable).
 #
 # Artifacts (artifact: shairport-armhf): shairport-sync_5.5.2_armhf.tar.gz
 #   (usr/bin/shairport-sync + sample shairport-sync.conf + BUILD-INFO.txt)
@@ -46,34 +47,25 @@ env:
   # silently building something else).
   TARBALL_SHA256_5_5_2: abcdb59674b6eedb4f3f6228f3c702e65d2cdc037231b0c48617fd90891b49e9
 
+# ABI 说明：构建必须吃 trixie 的 armhf 库（板子就是 trixie）。
+# trixie 主归档自带 armhf（构建机 ubuntu-24.04 的 noble 仓没有，之前走 ports
+# 吃过 404 的亏）。容器 debian:trixie-slim 里全是 trixie，soname 天然对上板子。
 jobs:
   build:
     name: Cross-build shairport-sync (armhf)
     runs-on: ubuntu-24.04
+    container:
+      image: debian:trixie-slim
     steps:
       - name: Install armhf cross toolchain + dev libraries
         run: |
-          # Ubuntu noble 的主归档（含 security）没有 armhf 二进制，armhf 走 ports；
-          # 同时把自带源限成 amd64，否则 apt 一看到 armhf 索引 404 就整步失败。
-          echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ noble main universe" | sudo tee /etc/apt/sources.list.d/armhf-ports.list
-          echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ noble-updates main universe" | sudo tee -a /etc/apt/sources.list.d/armhf-ports.list
-          echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ noble-security main universe" | sudo tee -a /etc/apt/sources.list.d/armhf-ports.list
-          sudo python3 - <<'PY'
-          import glob, re
-          for p in glob.glob("/etc/apt/sources.list.d/*.sources"):
-              s = open(p).read()
-              # 每个 stanza 补 Architectures: amd64（已有就不动）
-              out = []
-              for stanza in s.split("\n\n"):
-                  if re.search(r"^Types:", stanza, re.M) and "Architectures:" not in stanza:
-                      stanza = re.sub(r"^(Types:.*)$", r"\1\nArchitectures: amd64", stanza, flags=re.M)
-                  out.append(stanza)
-              open(p, "w").write("\n\n".join(out))
-          print("sources restricted to amd64")
-          PY
-          sudo dpkg --add-architecture armhf
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq \
+          # trixie 主归档自带 armhf，不需要 ports。容器内已是 root，不用 sudo；
+          # slim 镜像连 curl/ca-certificates 都没有，先装。
+          apt-get update -qq
+          apt-get install -y -qq ca-certificates curl
+          dpkg --add-architecture armhf
+          apt-get update -qq
+          apt-get install -y -qq \
             gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf autoconf automake libtool pkg-config xxd \
             libasound2-dev:armhf libavahi-client-dev:armhf libssl-dev:armhf \
             libconfig-dev:armhf libpopt-dev:armhf libsoxr-dev:armhf \
