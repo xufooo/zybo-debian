@@ -66,7 +66,7 @@ jobs:
           dpkg --add-architecture armhf
           apt-get update -qq
           apt-get install -y -qq \
-            gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf autoconf automake libtool pkg-config xxd \
+            gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf autoconf automake libtool pkg-config xxd make gawk \
             libasound2-dev:armhf libavahi-client-dev:armhf libssl-dev:armhf \
             libconfig-dev:armhf libpopt-dev:armhf libsoxr-dev:armhf \
             libdaemon-dev:armhf libavcodec-dev:armhf libavutil-dev:armhf \
