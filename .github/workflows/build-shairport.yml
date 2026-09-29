@@ -52,6 +52,10 @@ jobs:
     steps:
       - name: Install armhf cross toolchain + dev libraries
         run: |
+          # Ubuntu noble 的主归档（含 security）没有 armhf 二进制，armhf 走 ports
+          echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ noble main universe" | sudo tee /etc/apt/sources.list.d/armhf-ports.list
+          echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ noble-updates main universe" | sudo tee -a /etc/apt/sources.list.d/armhf-ports.list
+          echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ noble-security main universe" | sudo tee -a /etc/apt/sources.list.d/armhf-ports.list
           sudo dpkg --add-architecture armhf
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
