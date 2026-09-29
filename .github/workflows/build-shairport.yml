@@ -9,9 +9,10 @@
 #
 # Feature set (must match what the board actually uses; see
 # hooks/customize03-shairport.sh for the pinned runtime configuration):
-#   + alsa, avahi, ssl=openssl, soxr, metadata, metadata-pipe, apple-alac,
-#     stdout, pipe, systemd
-#   - airplay-2, ffmpeg, jack, pipewire, pulseaudio, mqtt, dbus, soundio
+#   + alsa, avahi, ssl=openssl, soxr, metadata, metadata-pipe, ffmpeg (ALAC
+#     decoder; the apple decoder needs an extra external lib, Debian's own
+#     build also uses ffmpeg), stdout, pipe
+#   - airplay-2, apple-alac, jack, pipewire, pulseaudio, mqtt, dbus, soundio
 # If the board ever needs one of the disabled ones, enable it here AND update
 # the hook + offline gate (tools/offline_release_check.sh C8).
 #
@@ -76,7 +77,8 @@ jobs:
             gcc-arm-linux-gnueabihf autoconf automake libtool pkg-config xxd \
             libasound2-dev:armhf libavahi-client-dev:armhf libssl-dev:armhf \
             libconfig-dev:armhf libpopt-dev:armhf libsoxr-dev:armhf \
-            libdaemon-dev:armhf qemu-user-static
+            libdaemon-dev:armhf libavcodec-dev:armhf libavutil-dev:armhf \
+            qemu-user-static
 
       - name: Fetch + verify upstream source
         run: |
@@ -93,8 +95,8 @@ jobs:
           ./configure --host=arm-linux-gnueabihf --prefix=/usr \
             --with-alsa --with-avahi --with-ssl=openssl --with-soxr \
             --with-metadata --with-metadata-pipe \
-            --with-apple-alac --with-stdout --with-pipe --with-systemd \
-            --without-airplay-2 --without-ffmpeg \
+            --with-ffmpeg --with-stdout --with-pipe \
+            --without-airplay-2 --without-apple-alac \
             --without-jack --without-pipewire --without-pulseaudio \
             --without-mqtt-client --without-dbus-interface \
             --without-soundio --without-sndio --without-ao
@@ -120,8 +122,8 @@ jobs:
           cp shairport-sync.conf.sample pkg/ 2>/dev/null || cp scripts/shairport-sync.conf.sample pkg/ 2>/dev/null || true
           {
             echo "upstream_tag=${VER}"
-            echo "configured_flags: alsa avahi ssl=openssl soxr metadata metadata-pipe apple-alac stdout pipe systemd"
-            echo "disabled: airplay-2 ffmpeg jack pipewire pulseaudio mqtt dbus soundio sndio ao"
+            echo "configured_flags: alsa avahi ssl=openssl soxr metadata metadata-pipe ffmpeg stdout pipe"
+            echo "disabled: airplay-2 apple-alac jack pipewire pulseaudio mqtt dbus soundio sndio ao"
             echo "built=$(date -u +%Y-%m-%dT%H:%M:%SZ) runner=$(uname -m) host=arm-linux-gnueabihf"
             ./shairport-sync -V 2>/dev/null || qemu-arm-static -L /usr/arm-linux-gnueabihf ./shairport-sync -V
           } > pkg/BUILD-INFO.txt
