@@ -1,0 +1,120 @@
+# ============================================================================
+# build-shairport.yml — cross-build shairport-sync for ZYBO (armhf) on CI
+# ============================================================================
+# Why not the Debian package: trixie ships 4.3.7; 5.x (vernier resampler for
+# weak CPUs, 48k-native operation) exists only in sid/testing as a dev snapshot
+# whose dependency set (FFmpeg 9, libc6>=2.43, jack/pipewire/pulse/…) cannot be
+# satisfied on trixie. So we build upstream releases ourselves, classic AirPlay
+# only (no AirPlay 2 / NQPTP, same as the board runs today).
+#
+# Feature set (must match what the board actually uses; see
+# hooks/customize03-shairport.sh for the pinned runtime configuration):
+#   + alsa, avahi, ssl=openssl, soxr, metadata, metadata-pipe, apple-alac,
+#     stdout, pipe, systemd
+#   - airplay-2, ffmpeg, jack, pipewire, pulseaudio, mqtt, dbus, soundio
+# If the board ever needs one of the disabled ones, enable it here AND update
+# the hook + offline gate (tools/offline_release_check.sh C8).
+#
+# ABI note: built on ubuntu-24.04 (glibc 2.39) for trixie (glibc 2.41).
+# Binaries built against the OLDER libc run on the newer one; the reverse
+# would break. Verify on the board with `ldd /usr/bin/shairport-sync`.
+#
+# Artifacts (artifact: shairport-armhf): shairport-sync_5.5.2_armhf.tar.gz
+#   (usr/bin/shairport-sync + sample shairport-sync.conf + BUILD-INFO.txt)
+# Integration into the image is a separate step (files/ overlay + hook);
+# this workflow only produces a tested binary. Do NOT auto-deploy it.
+# ============================================================================
+name: Build shairport-sync (armhf)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Upstream tag (e.g. 5.5.2)'
+        required: false
+        default: '5.5.2'
+
+concurrency:
+  group: shairport-armhf
+  cancel-in-progress: true
+
+env:
+  VER: ${{ github.event.inputs.version || '5.5.2' }}
+  # Pinned tarball hash. Bump together with VER (upstream tags are mutable
+  # only by force-push; a mismatch fails the build loudly instead of
+  # silently building something else).
+  TARBALL_SHA256_5_5_2: abcdb59674b6eedb4f3f6228f3c702e65d2cdc037231b0c48617fd90891b49e9
+
+jobs:
+  build:
+    name: Cross-build shairport-sync (armhf)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install armhf cross toolchain + dev libraries
+        run: |
+          sudo dpkg --add-architecture armhf
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            gcc-arm-linux-gnueabihf autoconf automake libtool pkg-config xxd \
+            libasound2-dev:armhf libavahi-client-dev:armhf libssl-dev:armhf \
+            libconfig-dev:armhf libpopt-dev:armhf libsoxr-dev:armhf \
+            libdaemon-dev:armhf qemu-user-static
+
+      - name: Fetch + verify upstream source
+        run: |
+          curl -sSL -o shairport-sync.tar.gz \
+            "https://github.com/mikebrady/shairport-sync/archive/refs/tags/${VER}.tar.gz"
+          echo "${TARBALL_SHA256_5_5_2}  shairport-sync.tar.gz" | sha256sum -c -
+          tar xzf shairport-sync.tar.gz
+          ls "shairport-sync-${VER}/configure.ac"
+
+      - name: Configure (classic AirPlay, minimal backends)
+        working-directory: shairport-sync-${{ env.VER }}
+        run: |
+          autoreconf -fi
+          ./configure --host=arm-linux-gnueabihf --prefix=/usr \
+            --with-alsa --with-avahi --with-ssl=openssl --with-soxr \
+            --with-metadata --with-metadata-pipe \
+            --with-apple-alac --with-stdout --with-pipe --with-systemd \
+            --without-airplay-2 --without-ffmpeg \
+            --without-jack --without-pipewire --without-pulseaudio \
+            --without-mqtt-client --without-dbus-interface \
+            --without-soundio --without-sndio --without-ao
+
+      - name: Build
+        working-directory: shairport-sync-${{ env.VER }}
+        run: |
+          make -j"$(nproc)"
+          file shairport-sync | grep -q "ARM" || (file shairport-sync; exit 1)
+
+      - name: Smoke the binary under qemu (version string = feature receipt)
+        working-directory: shairport-sync-${{ env.VER }}
+        run: |
+          qemu-arm-static -L /usr/arm-linux-gnueabihf ./shairport-sync -V
+          qemu-arm-static -L /usr/arm-linux-gnueabihf ./shairport-sync -V 2>&1 | grep -q "5\.5\.2" || exit 1
+
+      - name: Package artifact
+        working-directory: shairport-sync-${{ env.VER }}
+        run: |
+          mkdir -p pkg/usr/bin
+          cp shairport-sync pkg/usr/bin/
+          arm-linux-gnueabihf-strip pkg/usr/bin/shairport-sync || true
+          cp shairport-sync.conf.sample pkg/ 2>/dev/null || cp scripts/shairport-sync.conf.sample pkg/ 2>/dev/null || true
+          {
+            echo "upstream_tag=${VER}"
+            echo "configured_flags: alsa avahi ssl=openssl soxr metadata metadata-pipe apple-alac stdout pipe systemd"
+            echo "disabled: airplay-2 ffmpeg jack pipewire pulseaudio mqtt dbus soundio sndio ao"
+            echo "built=$(date -u +%Y-%m-%dT%H:%M:%SZ) runner=$(uname -m) host=arm-linux-gnueabihf"
+            ./shairport-sync -V 2>/dev/null || qemu-arm-static -L /usr/arm-linux-gnueabihf ./shairport-sync -V
+          } > pkg/BUILD-INFO.txt
+          tar czf "shairport-sync_${VER}_armhf.tar.gz" -C pkg .
+          sha256sum "shairport-sync_${VER}_armhf.tar.gz" | tee sha256.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shairport-armhf
+          path: |
+            shairport-sync-${{ env.VER }}/shairport-sync_${{ env.VER }}_armhf.tar.gz
+            shairport-sync-${{ env.VER }}/sha256.txt
+          retention-days: 90
