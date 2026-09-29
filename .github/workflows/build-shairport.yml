@@ -93,7 +93,16 @@ jobs:
         working-directory: shairport-sync-${{ env.VER }}
         run: |
           autoreconf -fi
-          ./configure --host=arm-linux-gnueabihf --prefix=/usr \
+          # 交叉全家桶必须显式导出：只给 --host 时 link 仍会调本机 /usr/bin/ld，
+          # ARM 的 .o 进 x86 的 ld 直接 "file in wrong format"（实测）。
+          export CC=arm-linux-gnueabihf-gcc
+          export CXX=arm-linux-gnueabihf-g++
+          export AR=arm-linux-gnueabihf-ar
+          export RANLIB=arm-linux-gnueabihf-ranlib
+          export STRIP=arm-linux-gnueabihf-strip
+          export LD=arm-linux-gnueabihf-ld
+          export PKG_CONFIG_PATH=/usr/lib/arm-linux-gnueabihf/pkgconfig
+          ./configure --build=x86_64-linux-gnu --host=arm-linux-gnueabihf --prefix=/usr \
             --with-alsa --with-avahi --with-ssl=openssl --with-soxr \
             --with-metadata --with-metadata-pipe \
             --with-ffmpeg --with-stdout --with-pipe \
