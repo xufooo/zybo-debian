@@ -103,6 +103,7 @@ jobs:
           export LD=arm-linux-gnueabihf-ld
           export PKG_CONFIG_PATH=/usr/lib/arm-linux-gnueabihf/pkgconfig
           ./configure --build=x86_64-linux-gnu --host=arm-linux-gnueabihf --prefix=/usr \
+            --sysconfdir=/etc \
             --with-alsa --with-avahi --with-ssl=openssl --with-soxr \
             --with-metadata --with-metadata-pipe \
             --with-ffmpeg --with-stdout --with-pipe \
@@ -121,7 +122,12 @@ jobs:
         working-directory: shairport-sync-${{ env.VER }}
         run: |
           qemu-arm-static -L /usr/arm-linux-gnueabihf ./shairport-sync -V
-          qemu-arm-static -L /usr/arm-linux-gnueabihf ./shairport-sync -V 2>&1 | grep -q "5\.5\.2" || exit 1
+          # 上游 tag 与 configure.ac 里 baked 的版本号可能差一位（如 5.5.2 的包自报 5.5.1）：
+          # 以源码里的 AC_INIT 为准，不以输入的 VER 为准。
+          SRCVER=$(grep -oP '^AC_INIT\(\[shairport-sync\],\[\K[0-9.]+' configure.ac | head -1)
+          echo "source says version = ${SRCVER}"
+          qemu-arm-static -L /usr/arm-linux-gnueabihf ./shairport-sync -V 2>&1 | grep -q "${SRCVER}" || exit 1
+          qemu-arm-static -L /usr/arm-linux-gnueabihf ./shairport-sync -V 2>&1 | grep -q "sysconfdir:/etc" || exit 1
 
       - name: Package artifact
         working-directory: shairport-sync-${{ env.VER }}
