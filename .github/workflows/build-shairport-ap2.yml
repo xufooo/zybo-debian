@@ -1,0 +1,143 @@
+# ============================================================================
+# build-shairport-ap2.yml — cross-build shairport-sync (AirPlay 2) + nqptp
+# ============================================================================
+# 実験分支专用：AirPlay 2 能否在这块板子上跑（48k 无损零转换 + 大缓冲），
+# 先只出二进制，不动板上现运行的 classic 版，不进镜像。
+#
+# 两件产物：
+#   1. shairport-sync 5.5.2 --with-airplay-2（其余特性面与 classic 版一致：
+#      alsa/avahi/ssl/soxr/metadata/ffmpeg；无 jack/pw/pa/mqtt/dbus）
+#   2. nqptp 1.2.8（AP2 计时守护进程，独占 UDP 319/320；板上已确认空闲）
+#
+# 上板顺序（service_type=auto：NQPTP 没跑 = classic，有跑 = AP2）：
+#   ① 只换 shairport 二进制、不启动 nqptp ⇒ 行为与 classic 版一致（先验证这步）；
+#   ② 再起 nqptp ⇒ 进入 AP2，用无损曲目 A/B（CPU、真 48k、锁屏控制）。
+# 任何一步翻车：换回 classic 二进制 + 停 nqptp，1 分钟回滚。
+# ============================================================================
+name: Build shairport-sync AirPlay 2 + nqptp (armhf)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Upstream shairport tag (e.g. 5.5.2)'
+        required: false
+        default: '5.5.2'
+      nqptp_version:
+        description: 'Upstream nqptp tag (e.g. 1.2.8)'
+        required: false
+        default: '1.2.8'
+
+concurrency:
+  group: shairport-ap2
+  cancel-in-progress: true
+
+env:
+  VER: ${{ github.event.inputs.version || '5.5.2' }}
+  NQPTP_VER: ${{ github.event.inputs.nqptp_version || '1.2.8' }}
+  TARBALL_SHA256_5_5_2: abcdb59674b6eedb4f3f6228f3c702e65d2cdc037231b0c48617fd90891b49e9
+
+jobs:
+  build:
+    name: Cross-build shairport-sync AP2 + nqptp (armhf)
+    runs-on: ubuntu-24.04
+    container:
+      image: debian:trixie-slim
+    steps:
+      - name: Install armhf cross toolchain + dev libraries
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq ca-certificates curl
+          dpkg --add-architecture armhf
+          apt-get update -qq
+          apt-get install -y -qq \
+            gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf autoconf automake libtool pkg-config xxd make gawk \
+            libasound2-dev:armhf libavahi-client-dev:armhf libssl-dev:armhf \
+            libconfig-dev:armhf libpopt-dev:armhf libsoxr-dev:armhf \
+            libdaemon-dev:armhf libavcodec-dev:armhf libavutil-dev:armhf \
+            libavformat-dev:armhf \
+            qemu-user-static
+
+      - name: Fetch + verify shairport source
+        run: |
+          curl -sSL -o shairport-sync.tar.gz \
+            "https://github.com/mikebrady/shairport-sync/archive/refs/tags/${VER}.tar.gz"
+          echo "${TARBALL_SHA256_5_5_2}  shairport-sync.tar.gz" | sha256sum -c -
+          tar xzf shairport-sync.tar.gz
+
+      - name: Fetch nqptp source (hash recorded, pinned on second run)
+        run: |
+          curl -sSL -o nqptp.tar.gz \
+            "https://github.com/mikebrady/nqptp/archive/refs/tags/${NQPTP_VER}.tar.gz"
+          sha256sum nqptp.tar.gz | tee nqptp.sha256
+          tar xzf nqptp.tar.gz
+
+      - name: Build nqptp
+        run: |
+          export CC=arm-linux-gnueabihf-gcc AR=arm-linux-gnueabihf-ar RANLIB=arm-linux-gnueabihf-ranlib
+          cd "nqptp-${NQPTP_VER}"
+          autoreconf -fi
+          ./configure --build=x86_64-linux-gnu --host=arm-linux-gnueabihf --prefix=/usr
+          make -j"$(nproc)"
+          file nqptp | grep -q "ARM" || (file nqptp; exit 1)
+
+      - name: Configure shairport (classic set + airplay-2)
+        working-directory: shairport-sync-${{ env.VER }}
+        run: |
+          autoreconf -fi
+          export CC=arm-linux-gnueabihf-gcc
+          export CXX=arm-linux-gnueabihf-g++
+          export AR=arm-linux-gnueabihf-ar
+          export RANLIB=arm-linux-gnueabihf-ranlib
+          export STRIP=arm-linux-gnueabihf-strip
+          export LD=arm-linux-gnueabihf-ld
+          export PKG_CONFIG_PATH=/usr/lib/arm-linux-gnueabihf/pkgconfig
+          ./configure --build=x86_64-linux-gnu --host=arm-linux-gnueabihf --prefix=/usr \
+            --sysconfdir=/etc \
+            --with-airplay-2 \
+            --with-alsa --with-avahi --with-ssl=openssl --with-soxr \
+            --with-metadata --with-metadata-pipe \
+            --with-ffmpeg --with-stdout --with-pipe \
+            --without-apple-alac \
+            --without-jack --without-pipewire --without-pulseaudio \
+            --without-mqtt-client --without-dbus-interface \
+            --without-soundio --without-sndio --without-ao
+
+      - name: Build shairport
+        working-directory: shairport-sync-${{ env.VER }}
+        run: |
+          make -j"$(nproc)"
+          file shairport-sync | grep -q "ARM" || (file shairport-sync; exit 1)
+
+      - name: Smoke both binaries under qemu
+        run: |
+          cd "shairport-sync-${VER}"
+          qemu-arm-static -L /usr/arm-linux-gnueabihf ./shairport-sync -V
+          # 版本串必须带 AirPlay2（否则 --with-airplay-2 实际没生效）
+          qemu-arm-static -L /usr/arm-linux-gnueabihf ./shairport-sync -V 2>&1 | grep -q "AirPlay2" || exit 1
+          cd "../nqptp-${NQPTP_VER}"
+          qemu-arm-static -L /usr/arm-linux-gnueabihf ./nqptp -V 2>&1 | head -1 || true
+
+      - name: Package artifacts
+        run: |
+          mkdir -p pkg-ap2/usr/bin
+          cp "shairport-sync-${VER}/shairport-sync" pkg-ap2/usr/bin/
+          cp "nqptp-${NQPTP_VER}/nqptp" pkg-ap2/usr/bin/
+          arm-linux-gnueabihf-strip pkg-ap2/usr/bin/shairport-sync pkg-ap2/usr/bin/nqptp || true
+          {
+            echo "upstream_tag=${VER} nqptp_tag=${NQPTP_VER}"
+            echo "shairport_flags: airplay-2 alsa avahi ssl=openssl soxr metadata metadata-pipe ffmpeg stdout pipe"
+            echo "built=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            cat nqptp.sha256
+          } > pkg-ap2/BUILD-INFO.txt
+          tar czf "shairport-ap2_${VER}_armhf.tar.gz" -C pkg-ap2 .
+          sha256sum "shairport-ap2_${VER}_armhf.tar.gz" | tee sha256-ap2.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shairport-ap2-armhf
+          path: |
+            shairport-ap2_${{ env.VER }}_armhf.tar.gz
+            sha256-ap2.txt
+          retention-days: 90
