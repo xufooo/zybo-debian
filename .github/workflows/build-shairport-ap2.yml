@@ -58,7 +58,7 @@ jobs:
             libasound2-dev:armhf libavahi-client-dev:armhf libssl-dev:armhf \
             libconfig-dev:armhf libpopt-dev:armhf libsoxr-dev:armhf \
             libdaemon-dev:armhf libavcodec-dev:armhf libavutil-dev:armhf \
-            libavformat-dev:armhf \
+            libavformat-dev:armhf libplist-dev:armhf libplist-utils \
             qemu-user-static
 
       - name: Fetch + verify shairport source
