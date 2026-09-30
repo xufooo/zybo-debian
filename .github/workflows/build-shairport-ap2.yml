@@ -59,7 +59,7 @@ jobs:
             libconfig-dev:armhf libpopt-dev:armhf libsoxr-dev:armhf \
             libdaemon-dev:armhf libavcodec-dev:armhf libavutil-dev:armhf \
             libavformat-dev:armhf libplist-dev:armhf libplist-utils \
-            libsodium-dev:armhf libgcrypt-dev:armhf \
+            libsodium-dev:armhf libgcrypt-dev:armhf uuid-dev:armhf \
             qemu-user-static
 
       - name: Fetch + verify shairport source
