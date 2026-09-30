@@ -27,6 +27,9 @@ on:
         description: 'Upstream nqptp tag (e.g. 1.2.8)'
         required: false
         default: '1.2.8'
+  push:
+    branches: [shairport-ap2]
+    paths: [.github/workflows/build-shairport-ap2.yml]
 
 concurrency:
   group: shairport-ap2
